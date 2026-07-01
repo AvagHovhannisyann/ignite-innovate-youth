@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 import { Plus, Calendar as CalIcon, Trash2, ExternalLink, Copy, Check, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/schedule")({ component: SchedulePage });
@@ -65,6 +66,14 @@ function SchedulePage() {
     setOrigin(window.location.origin);
   }, []);
 
+  // Close the add-event dialog with Escape.
+  useEffect(() => {
+    if (!showAdd) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowAdd(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showAdd]);
+
   useEffect(() => {
     if (loading) return;
     if (!user) { nav({ to: "/auth" }); return; }
@@ -108,15 +117,39 @@ function SchedulePage() {
       ends_at: new Date(`${date}T${end}`).toISOString(),
       source: "manual",
     }).select().single();
-    if (error) { alert(error.message); return; }
+    if (error) { toast.error("Չհաջողվեց պահպանել իրադարձությունը"); return; }
     setEvents((p) => [...p, data as any].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
     setShowAdd(false);
+    toast.success("Իրադարձությունն ավելացվեց");
   }
 
+  // Optimistic delete with undo: remove immediately, restore on error or undo.
   async function deleteEvent(id: string) {
-    if (!confirm("Ջնջե՞լ իրադարձությունը։")) return;
-    await supabase.from("schedule_events").delete().eq("id", id);
+    const ev = events.find((e) => e.id === id);
+    if (!ev) return;
+    const restore = () =>
+      setEvents((p) => [...p, ev].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
     setEvents((p) => p.filter((e) => e.id !== id));
+    const { error } = await supabase.from("schedule_events").delete().eq("id", id);
+    if (error) {
+      restore();
+      toast.error("Չհաջողվեց ջնջել");
+      return;
+    }
+    toast("Իրադարձությունը ջնջվեց", {
+      action: {
+        label: "Վերադարձնել",
+        onClick: async () => {
+          const { data } = await supabase.from("schedule_events").insert({
+            user_id: user!.id, title: ev.title, description: ev.description,
+            starts_at: ev.starts_at, ends_at: ev.ends_at,
+            location: ev.location, kind: ev.kind, source: ev.source,
+          }).select().single();
+          if (data) setEvents((p) => [...p, data as any].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
+          else toast.error("Չհաջողվեց վերադարձնել");
+        },
+      },
+    });
   }
 
   const icsUrl = icsToken && origin ? `${origin}/api/public/ics/${icsToken}.ics` : "";

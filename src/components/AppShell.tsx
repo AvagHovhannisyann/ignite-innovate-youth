@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsDropdown } from "@/components/NotificationsDropdown";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { CommandCenter, CommandCenterTrigger } from "@/components/CommandCenter";
 import {
   LayoutDashboard, Calendar, Compass, Trophy, Newspaper, Users,
   Sparkles, MessageCircleQuestion, Shield, ChevronLeft, ChevronRight,
@@ -144,6 +146,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0"><PageTitle /></div>
+          <CommandCenterTrigger />
+          <ThemeToggle />
           <Link to="/support" className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full hover:bg-secondary" aria-label="Օգնություն">
             <HelpCircle className="w-5 h-5 text-muted-foreground" />
           </Link>
@@ -161,6 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <MobileTabBar />
       </div>
+      <CommandCenter />
     </div>
   );
 }

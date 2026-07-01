@@ -82,6 +82,48 @@
   --shadow-lift: 0 30px 80px -30px oklch(0.55 0.14 235 / 0.35);
 }
 
+/* Dark theme — same brand hues (235 blue / 55 orange), inverted lightness. */
+.dark {
+  --background: oklch(0.16 0.02 250);
+  --foreground: oklch(0.93 0.012 240);
+  --card: oklch(0.205 0.025 248);
+  --card-foreground: oklch(0.93 0.012 240);
+  --popover: oklch(0.205 0.025 248);
+  --popover-foreground: oklch(0.93 0.012 240);
+  --primary: oklch(0.72 0.13 235);
+  --primary-foreground: oklch(0.13 0.03 245);
+  --primary-glow: oklch(0.8 0.11 230);
+  --secondary: oklch(0.26 0.025 246);
+  --secondary-foreground: oklch(0.9 0.012 240);
+  --muted: oklch(0.24 0.02 246);
+  --muted-foreground: oklch(0.68 0.02 240);
+  --accent: oklch(0.74 0.15 58);
+  --accent-foreground: oklch(0.16 0.05 60);
+  --accent-soft: oklch(0.28 0.04 240);
+  --accent-soft-foreground: oklch(0.8 0.08 235);
+
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.7 0.14 155);
+  --success-foreground: oklch(0.14 0.03 155);
+  --border: oklch(0.3 0.022 246);
+  --input: oklch(0.28 0.022 246);
+  --ring: oklch(0.72 0.13 235);
+
+  --gradient-hero: linear-gradient(135deg, oklch(0.52 0.13 240) 0%, oklch(0.62 0.12 230) 100%);
+  --gradient-warm: linear-gradient(135deg, oklch(0.6 0.15 55) 0%, oklch(0.68 0.13 60) 100%);
+  --gradient-brand: linear-gradient(135deg, oklch(0.58 0.13 238) 0%, oklch(0.66 0.15 55) 100%);
+  --gradient-soft: radial-gradient(1200px 600px at 10% -10%, oklch(0.3 0.06 240 / 0.55), transparent 60%),
+                   radial-gradient(900px 500px at 110% 10%, oklch(0.3 0.07 60 / 0.35), transparent 60%),
+                   linear-gradient(180deg, oklch(0.17 0.022 248) 0%, oklch(0.15 0.02 250) 100%);
+  --gradient-card: linear-gradient(160deg, oklch(0.23 0.028 248 / 0.92) 0%, oklch(0.19 0.024 248 / 0.75) 100%);
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px -12px oklch(0 0 0 / 0.5);
+  --shadow-elegant: 0 1px 2px oklch(0 0 0 / 0.3), 0 24px 60px -24px oklch(0 0 0 / 0.6);
+  --shadow-glow: 0 0 60px oklch(0.66 0.15 55 / 0.2);
+  --shadow-lift: 0 30px 80px -30px oklch(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -579,4 +621,58 @@
   50% { opacity: .6; }
 }
 .animate-pulse-soft { animation: pulse-soft 2.2s ease-in-out infinite; }
+
+/* Bento tiles — interactive modules with a cursor-tracked glow (see data-glow JS). */
+.bento-tile {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border);
+  background: var(--gradient-card);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  transition: transform 400ms cubic-bezier(.2,.7,.2,1), box-shadow 400ms cubic-bezier(.2,.7,.2,1), border-color 300ms;
+}
+.bento-tile::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(420px circle at var(--glow-x, 50%) var(--glow-y, 0%), oklch(0.72 0.13 235 / 0.14), transparent 65%);
+  opacity: 0;
+  transition: opacity 350ms ease;
+  pointer-events: none;
+}
+.bento-tile:hover { border-color: color-mix(in oklab, var(--primary) 35%, var(--border)); box-shadow: var(--shadow-lift); }
+.bento-tile:hover::before { opacity: 1; }
+
+@media (hover: none) and (pointer: coarse) {
+  .bento-tile:hover { box-shadow: var(--shadow-soft); }
+}
+
+/* Demo XP bar on the landing bento — fills once on load. */
+.demo-bar {
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--secondary);
+  overflow: hidden;
+}
+.demo-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gradient-brand);
+  animation: demofill 1.6s cubic-bezier(.2,.7,.2,1) 0.4s both;
+}
+@keyframes demofill {
+  from { width: 0; }
+}
+
+/* Respect users who prefer less motion: collapse decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 

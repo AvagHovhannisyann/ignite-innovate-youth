@@ -6,6 +6,7 @@ import { Menu, X, LogOut, Bell, Users, GraduationCap, Flame, Shield } from "luci
 import logo from "@/assets/logo.png";
 import { NotificationsDropdown } from "@/components/NotificationsDropdown";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Navbar() {
   const { user } = useAuth();
@@ -72,6 +73,7 @@ export function Navbar() {
 
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <ThemeToggle />
           <Link to="/auth" className="hidden sm:inline-flex text-sm px-3 py-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground">Մուտք</Link>
           <Link to="/auth" search={{ mode: "signup" }} className="text-sm px-3 sm:px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 font-medium shadow-soft min-h-[44px] inline-flex items-center">Միանալ</Link>
 
