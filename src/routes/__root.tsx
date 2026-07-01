@@ -99,7 +99,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@600;700&display=swap",
+        // Noto Sans/Serif Armenian back up Inter/Fraunces/Fredoka, which have no Armenian glyphs.
+        href: "https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@600;700&family=Noto+Sans+Armenian:wght@400;500;600;700&family=Noto+Serif+Armenian:wght@500;700&display=swap",
       },
     ],
   }),
