@@ -6,14 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const OPENROUTER_MODEL = Deno.env.get("OPENROUTER_MODEL") || "openrouter/auto";
+// Strongest free OpenRouter models first; free-tier IDs rotate, so the list
+// is a fallback chain and OPENROUTER_MODEL overrides the default without a deploy.
+const OPENROUTER_MODEL = Deno.env.get("OPENROUTER_MODEL") || "deepseek/deepseek-chat-v3.1:free";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
 const FALLBACK_MODELS = [
-  "openrouter/auto",
-  "qwen/qwen-2.5-7b-instruct:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "google/gemma-2-9b-it:free",
+  "deepseek/deepseek-chat-v3.1:free",
+  "qwen/qwen3-235b-a22b:free",
+  "meta-llama/llama-4-maverick:free",
+  "google/gemini-2.0-flash-exp:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
 ];
 
 async function callOpenRouter(messages: any[], model = OPENROUTER_MODEL): Promise<string | null> {
