@@ -50,7 +50,7 @@ export function Navbar() {
     <>
     <header className="sticky top-0 z-40 backdrop-blur-md bg-background/80 border-b border-border">
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-3">
-        <Link to="/" className="flex items-center gap-2 font-bold tracking-tight min-w-0">
+        <Link to="/" className="flex items-center gap-2 font-bold tracking-tight min-w-0 min-h-[44px] py-1">
           <img src={logo} alt="Էջմիածնի Երիտասարդական Տուն" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0" />
           <span className="text-foreground text-sm sm:text-base hidden min-[360px]:inline min-w-0 max-w-[128px] min-[430px]:max-w-[180px] sm:max-w-none overflow-hidden text-ellipsis" style={{ whiteSpace: "nowrap" }}>
             <span className="hidden sm:inline">Էջմիածնի </span>

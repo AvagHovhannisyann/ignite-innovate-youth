@@ -457,7 +457,7 @@ function ProfilePage() {
                       <Link
                         to="/projects/$id"
                         params={{ id: p.id }}
-                        className="font-medium hover:text-primary break-words block"
+                        className="font-medium hover:text-primary break-words block py-2.5 min-h-[44px]"
                       >
                         {p.title}
                       </Link>

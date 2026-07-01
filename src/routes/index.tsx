@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { GrowthSimulator } from "@/components/GrowthSimulator";
+import { BrandIntroTile } from "@/components/BrandIntro";
 import {
   Sparkles,
   Compass,
@@ -20,7 +21,7 @@ import logo from "@/assets/logo.png";
 export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
-    links: [{ rel: "preload", as: "image", href: logo, fetchpriority: "high" } as any],
+    links: [{ rel: "preload", as: "image", href: logo, fetchPriority: "high" } as any],
   }),
 });
 
@@ -272,6 +273,7 @@ function Landing() {
                 <AgentModule />
                 <XPModule />
                 <QuestModule />
+                <BrandIntroTile />
               </div>
             </div>
           </div>
@@ -401,11 +403,17 @@ function Landing() {
               © {new Date().getFullYear()} Էջմիածնի Երիտասարդական Տուն
             </span>
           </div>
-          <div className="flex items-center gap-5 sm:gap-6 text-sm text-muted-foreground">
-            <Link to="/opportunities" className="hover:text-foreground transition-colors">
+          <div className="flex items-center gap-2 sm:gap-3 text-sm text-muted-foreground">
+            <Link
+              to="/opportunities"
+              className="inline-flex items-center min-h-[44px] px-3 rounded-lg hover:text-foreground hover:bg-secondary/60 transition-colors"
+            >
               Հնարավորություններ
             </Link>
-            <Link to="/auth" className="hover:text-foreground transition-colors">
+            <Link
+              to="/auth"
+              className="inline-flex items-center min-h-[44px] px-3 rounded-lg hover:text-foreground hover:bg-secondary/60 transition-colors"
+            >
               Մուտք
             </Link>
           </div>

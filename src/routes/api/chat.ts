@@ -25,7 +25,10 @@ export const Route = createFileRoute("/api/chat")({
           const openRouterKey = process.env.OPENROUTER_API_KEY;
           const lovableKey = process.env.LOVABLE_API_KEY;
           if (!openRouterKey && !lovableKey)
-            return new Response("Missing OPENROUTER_API_KEY / LOVABLE_API_KEY", { status: 500, headers: corsHeaders });
+            return new Response("Missing OPENROUTER_API_KEY / LOVABLE_API_KEY", {
+              status: 500,
+              headers: corsHeaders,
+            });
           const auth = request.headers.get("authorization") || "";
           const token = auth.replace(/^Bearer\s+/i, "");
           if (!token) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
@@ -33,21 +36,46 @@ export const Route = createFileRoute("/api/chat")({
           const supabase = createClient(
             process.env.SUPABASE_URL!,
             process.env.SUPABASE_PUBLISHABLE_KEY!,
-            { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } },
+            {
+              auth: { persistSession: false, autoRefreshToken: false },
+              global: { headers: { Authorization: `Bearer ${token}` } },
+            },
           );
           const { data: userData, error: userErr } = await supabase.auth.getUser(token);
-          if (userErr || !userData.user) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+          if (userErr || !userData.user)
+            return new Response("Unauthorized", { status: 401, headers: corsHeaders });
           const userId = userData.user.id;
 
-          const { messages, threadId }: { messages: UIMessage[]; threadId?: string } = await request.json();
+          const { messages, threadId }: { messages: UIMessage[]; threadId?: string } =
+            await request.json();
 
           // Build a tiny context snapshot the model sees in the system prompt.
-          const [{ data: profile }, { data: projects }, { data: quests }, { data: schedule }] = await Promise.all([
-            supabase.from("profiles").select("full_name,email,xp,interests,bio").eq("id", userId).maybeSingle(),
-            supabase.from("started_projects").select("id,title,status,difficulty_tier").eq("user_id", userId).in("status", ["active", "submitted"]).limit(10),
-            supabase.from("user_quests").select("template_id,progress,awarded").eq("user_id", userId).limit(20),
-            supabase.from("schedule_events").select("id,title,starts_at,ends_at,kind").eq("user_id", userId).gte("ends_at", new Date().toISOString()).order("starts_at").limit(20),
-          ]);
+          const [{ data: profile }, { data: projects }, { data: quests }, { data: schedule }] =
+            await Promise.all([
+              supabase
+                .from("profiles")
+                .select("full_name,email,xp,interests,bio")
+                .eq("id", userId)
+                .maybeSingle(),
+              supabase
+                .from("started_projects")
+                .select("id,title,status,difficulty_tier")
+                .eq("user_id", userId)
+                .in("status", ["active", "submitted"])
+                .limit(10),
+              supabase
+                .from("user_quests")
+                .select("template_id,progress,awarded")
+                .eq("user_id", userId)
+                .limit(20),
+              supabase
+                .from("schedule_events")
+                .select("id,title,starts_at,ends_at,kind")
+                .eq("user_id", userId)
+                .gte("ends_at", new Date().toISOString())
+                .order("starts_at")
+                .limit(20),
+            ]);
           const contextSummary = `\n\nՈՒՍԱՆՈՂԻ ՀԱՄԱՏԵՔՍՏ՝\nՊրոֆիլ: ${JSON.stringify(profile || {})}\nԱկտիվ նախագծեր: ${JSON.stringify(projects || [])}\nՔվեսթներ: ${JSON.stringify(quests || [])}\nՕրակարգ (առաջիկա): ${JSON.stringify(schedule || [])}`;
 
           const model = openRouterKey
@@ -61,7 +89,11 @@ export const Route = createFileRoute("/api/chat")({
               description: "Բերում է ուսանողի պրոֆիլը՝ XP, հետաքրքրություններ, bio։",
               inputSchema: z.object({}),
               execute: async () => {
-                const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+                const { data } = await supabase
+                  .from("profiles")
+                  .select("*")
+                  .eq("id", userId)
+                  .maybeSingle();
                 return data || {};
               },
             }),
@@ -70,7 +102,13 @@ export const Route = createFileRoute("/api/chat")({
               inputSchema: z.object({ days_ahead: z.number().int().min(1).max(60).default(14) }),
               execute: async ({ days_ahead }) => {
                 const until = new Date(Date.now() + days_ahead * 86400000).toISOString();
-                const { data } = await supabase.from("schedule_events").select("*").eq("user_id", userId).lte("starts_at", until).gte("ends_at", new Date().toISOString()).order("starts_at");
+                const { data } = await supabase
+                  .from("schedule_events")
+                  .select("*")
+                  .eq("user_id", userId)
+                  .lte("starts_at", until)
+                  .gte("ends_at", new Date().toISOString())
+                  .order("starts_at");
                 return data || [];
               },
             }),
@@ -85,16 +123,20 @@ export const Route = createFileRoute("/api/chat")({
                 location: z.string().max(200).optional(),
               }),
               execute: async (input) => {
-                const { data, error } = await supabase.from("schedule_events").insert({
-                  user_id: userId,
-                  title: input.title,
-                  description: input.description,
-                  starts_at: input.starts_at,
-                  ends_at: input.ends_at,
-                  kind: input.kind,
-                  location: input.location,
-                  source: "ai",
-                }).select().single();
+                const { data, error } = await supabase
+                  .from("schedule_events")
+                  .insert({
+                    user_id: userId,
+                    title: input.title,
+                    description: input.description,
+                    starts_at: input.starts_at,
+                    ends_at: input.ends_at,
+                    kind: input.kind,
+                    location: input.location,
+                    source: "ai",
+                  })
+                  .select()
+                  .single();
                 if (error) return { ok: false, error: error.message };
                 return { ok: true, event: data };
               },
@@ -103,7 +145,11 @@ export const Route = createFileRoute("/api/chat")({
               description: "Ջնջում է օրակարգային իրադարձություն ID-ով։",
               inputSchema: z.object({ id: z.string().uuid() }),
               execute: async ({ id }) => {
-                const { error } = await supabase.from("schedule_events").delete().eq("id", id).eq("user_id", userId);
+                const { error } = await supabase
+                  .from("schedule_events")
+                  .delete()
+                  .eq("id", id)
+                  .eq("user_id", userId);
                 return error ? { ok: false, error: error.message } : { ok: true };
               },
             }),
@@ -111,12 +157,16 @@ export const Route = createFileRoute("/api/chat")({
               description: "Բերում է հասանելի հնարավորությունների ցանկը։",
               inputSchema: z.object({ limit: z.number().int().min(1).max(20).default(8) }),
               execute: async ({ limit }) => {
-                const { data } = await supabase.from("opportunities").select("id,title,category,description,difficulty").limit(limit);
+                const { data } = await supabase
+                  .from("opportunities")
+                  .select("id,title,category,description,difficulty")
+                  .limit(limit);
                 return data || [];
               },
             }),
             ask_admin: tool({
-              description: "Ուղարկում է հարց ադմինին ուսանողի անունից։ Օգտագործիր երբ ուսանողն ունի հարց, որի պատասխանը պետք է ադմինից։",
+              description:
+                "Ուղարկում է հարց ադմինին ուսանողի անունից։ Օգտագործիր երբ ուսանողն ունի հարց, որի պատասխանը պետք է ադմինից։",
               inputSchema: z.object({
                 subject: z.string().min(3).max(140),
                 question: z.string().min(5).max(2000),
@@ -125,7 +175,12 @@ export const Route = createFileRoute("/api/chat")({
               execute: async ({ subject, question, urgency }) => {
                 const { data: thread, error: e1 } = await supabase
                   .from("support_threads")
-                  .insert({ user_id: userId, subject: `[AI] ${subject}`, status: "open", origin: "ai_relay" })
+                  .insert({
+                    user_id: userId,
+                    subject: `[AI] ${subject}`,
+                    status: "open",
+                    origin: "ai_relay",
+                  })
                   .select()
                   .single();
                 if (e1) return { ok: false, error: e1.message };
@@ -136,19 +191,32 @@ export const Route = createFileRoute("/api/chat")({
                   content: `[AI agent on student's behalf, urgency: ${urgency}]\n\n${question}`,
                 });
                 if (e2) return { ok: false, error: e2.message };
-                return { ok: true, thread_id: thread.id, message: "Հարցն ուղարկվել է ադմինին։ Պատասխանը կհայտնվի «Աջակցություն» բաժնում։" };
+                return {
+                  ok: true,
+                  thread_id: thread.id,
+                  message: "Հարցն ուղարկվել է ադմինին։ Պատասխանը կհայտնվի «Աջակցություն» բաժնում։",
+                };
               },
             }),
             list_quests: tool({
               description: "Բերում է ուսանողի քվեսթների կարգավիճակը։",
               inputSchema: z.object({}),
               execute: async () => {
-                const [{ data: templates }, { data: progress }, { data: subs }] = await Promise.all([
-                  supabase.from("quest_templates").select("*").eq("active", true),
-                  supabase.from("user_quests").select("*").eq("user_id", userId),
-                  supabase.from("quest_submissions").select("template_id,status,period_key").eq("user_id", userId),
-                ]);
-                return { templates: templates || [], progress: progress || [], submissions: subs || [] };
+                const [{ data: templates }, { data: progress }, { data: subs }] = await Promise.all(
+                  [
+                    supabase.from("quest_templates").select("*").eq("active", true),
+                    supabase.from("user_quests").select("*").eq("user_id", userId),
+                    supabase
+                      .from("quest_submissions")
+                      .select("template_id,status,period_key")
+                      .eq("user_id", userId),
+                  ],
+                );
+                return {
+                  templates: templates || [],
+                  progress: progress || [],
+                  submissions: subs || [],
+                };
               },
             }),
             recommend_next_step: tool({
@@ -167,10 +235,16 @@ export const Route = createFileRoute("/api/chat")({
             messages: await convertToModelMessages(messages),
             tools,
             stopWhen: stepCountIs(20),
-            onFinish: async ({ response }) => {
-              // Persist last user msg + assistant msg into agent_messages
+          });
+
+          return result.toUIMessageStreamResponse({
+            headers: corsHeaders,
+            originalMessages: messages,
+            // Persist in UIMessage shape (parts incl. tool calls) so threads
+            // reload exactly as they streamed.
+            onEnd: async ({ responseMessage, isAborted }) => {
               try {
-                if (!threadId) return;
+                if (!threadId || isAborted) return;
                 const userMsg = messages[messages.length - 1];
                 if (userMsg?.role === "user") {
                   await supabase.from("agent_messages").insert({
@@ -180,21 +254,23 @@ export const Route = createFileRoute("/api/chat")({
                     ai_message_id: userMsg.id,
                   });
                 }
-                for (const m of response.messages) {
+                if (responseMessage) {
                   await supabase.from("agent_messages").insert({
                     thread_id: threadId,
-                    role: m.role,
-                    parts: (m as any).content as any,
+                    role: responseMessage.role,
+                    parts: responseMessage.parts as any,
+                    ai_message_id: responseMessage.id,
                   });
                 }
-                await supabase.from("agent_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+                await supabase
+                  .from("agent_threads")
+                  .update({ updated_at: new Date().toISOString() })
+                  .eq("id", threadId);
               } catch (e) {
                 console.error("agent persist failed", e);
               }
             },
           });
-
-          return result.toUIMessageStreamResponse({ headers: corsHeaders });
         } catch (e: any) {
           console.error("chat route error", e);
           return new Response(JSON.stringify({ error: e?.message || "agent failure" }), {
