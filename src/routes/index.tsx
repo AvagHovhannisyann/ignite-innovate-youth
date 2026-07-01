@@ -74,7 +74,7 @@ function Landing() {
                 <span className="truncate">AI-ով աշխատող երիտասարդական հարթակ</span>
               </div>
 
-              <h1 className="font-display text-[26px] min-[380px]:text-[31px] sm:text-5xl md:text-6xl lg:text-7xl xl:text-[84px] leading-[1.08] text-foreground mb-5 sm:mb-8 break-words max-w-full">
+              <h1 className="font-display text-[26px] min-[380px]:text-[31px] sm:text-5xl md:text-6xl lg:text-[64px] xl:text-[72px] leading-[1.08] text-foreground mb-5 sm:mb-8 max-w-full">
                 Տարածք
                 <br />
                 <span className="text-gradient italic font-medium">հետաքրքրա</span>
@@ -108,7 +108,7 @@ function Landing() {
               </div>
             </div>
 
-            <div className="lg:col-span-5 relative animate-rise overflow-hidden" style={{ animationDelay: "150ms" }}>
+            <div className="lg:col-span-5 relative animate-rise pt-6 pb-6 sm:pt-8 sm:pb-8" style={{ animationDelay: "150ms" }}>
               <div className="relative aspect-square w-full max-w-[300px] sm:max-w-md mx-auto px-2 sm:px-0">
                 <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-card glass shadow-elegant" />
                 <div className="absolute inset-0 grid place-items-center">
@@ -217,8 +217,7 @@ function Landing() {
           <div className="relative px-4 min-[380px]:px-5 sm:px-10 md:px-16 py-7 min-[380px]:py-8 sm:py-16 md:py-24 grid md:grid-cols-12 gap-5 sm:gap-10 items-center text-primary-foreground min-w-0 overflow-hidden">
             <div className="md:col-span-8">
               <h3 className="font-display text-[20px] min-[380px]:text-[22px] sm:text-4xl md:text-5xl leading-tight mb-4 sm:mb-5 break-words max-w-full">
-                Քո հետաքրքրու<wbr />թյունները արժանի են
-                <br className="hidden min-[380px]:block" />
+                Քո հետաքրքրությունները արժանի են{" "}
                 <span className="italic">աճելու տարածքի։</span>
               </h3>
               <p className="text-primary-foreground/80 text-sm min-[380px]:text-base sm:text-lg max-w-xl break-words">
