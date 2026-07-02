@@ -5,19 +5,32 @@ import { supabase } from "@/integrations/supabase/client";
 import { MarkdownLite } from "@/lib/markdown-lite";
 import {
   Send, Loader2, RotateCcw, ChevronDown, User as UserIcon, Calendar,
-  CalendarPlus, CalendarX, Compass, MessageCircleQuestion, Trophy, Lightbulb, Wrench,
+  CalendarPlus, CalendarX, CalendarCog, Compass, UserPlus, MessageCircleQuestion,
+  Trophy, Lightbulb, Wrench, Rocket, Send as SendIcon, Ban, ListChecks, Bell,
+  MessageSquareText, Award, FileCheck,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 /** Friendly Armenian labels for the agent's tools — no raw internals in the UI. */
 const TOOL_META: Record<string, { label: string; icon: typeof Wrench }> = {
   get_profile: { label: "Կարդում է քո պրոֆիլը", icon: UserIcon },
+  update_profile: { label: "Թարմացնում է քո պրոֆիլը", icon: UserIcon },
   list_schedule: { label: "Ստուգում է օրակարգը", icon: Calendar },
   add_schedule_event: { label: "Ավելացնում է իրադարձություն", icon: CalendarPlus },
+  update_schedule_event: { label: "Խմբագրում է իրադարձություն", icon: CalendarCog },
   delete_schedule_event: { label: "Ջնջում է իրադարձություն", icon: CalendarX },
   list_opportunities: { label: "Փնտրում է հնարավորություններ", icon: Compass },
+  join_opportunity: { label: "Գրանցում է հնարավորության", icon: UserPlus },
   ask_admin: { label: "Հարց է ուղարկում ադմինին", icon: MessageCircleQuestion },
+  list_my_support_threads: { label: "Ստուգում է ադմինի պատասխանները", icon: MessageSquareText },
   list_quests: { label: "Ստուգում է քվեսթները", icon: Trophy },
+  claim_quest: { label: "Հավաքագրում է քվեսթի XP-ն", icon: Award },
+  submit_quest_evidence: { label: "Ուղարկում է ապացույց", icon: FileCheck },
+  list_my_projects: { label: "Ստուգում է քո նախագծերը", icon: ListChecks },
+  start_project: { label: "Սկսում է նոր նախագիծ", icon: Rocket },
+  submit_project: { label: "Ուղարկում է նախագիծը ստուգման", icon: SendIcon },
+  cancel_project: { label: "Չեղարկում է նախագիծը", icon: Ban },
+  list_notifications: { label: "Ստուգում է ծանուցումները", icon: Bell },
   recommend_next_step: { label: "Մտածում է հաջորդ քայլի մասին", icon: Lightbulb },
 };
 
@@ -26,6 +39,7 @@ const SUGGESTED_PROMPTS = [
   "Ի՞նչ նախագիծ սկսեմ իմ հետաքրքրություններով",
   "Ցույց տուր իմ քվեսթների վիճակը",
   "Ավելացրու ուսումնական ժամ վաղը 18:00-ին",
+  "Կա՞ ինչ-որ բան, որ բաց եմ թողել",
 ];
 
 type Props = { threadId: string; initialMessages: UIMessage[]; onReset: () => void };

@@ -8,14 +8,18 @@ const corsHeaders = {
 
 // Strongest free OpenRouter models first; free-tier IDs rotate, so the list
 // is a fallback chain and OPENROUTER_MODEL overrides the default without a deploy.
-const OPENROUTER_MODEL = Deno.env.get("OPENROUTER_MODEL") || "deepseek/deepseek-chat-v3.1:free";
+// Verified live against the OpenRouter catalog: largest free tool-capable
+// model (frontier MoE), confirmed to return valid JSON under response_format.
+const OPENROUTER_MODEL =
+  Deno.env.get("OPENROUTER_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b:free";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
 const FALLBACK_MODELS = [
-  "deepseek/deepseek-chat-v3.1:free",
-  "qwen/qwen3-235b-a22b:free",
-  "meta-llama/llama-4-maverick:free",
-  "google/gemini-2.0-flash-exp:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "qwen/qwen3-coder:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "openai/gpt-oss-120b:free",
   "meta-llama/llama-3.3-70b-instruct:free",
 ];
 
