@@ -133,6 +133,37 @@ export const Route = createFileRoute("/api/chat")({
                 return { ok: true, event: data };
               },
             }),
+            update_schedule_event: tool({
+              description:
+                "Թարմացնում է գոյություն ունեցող օրակարգային իրադարձություն ID-ով (վերնագիր, ժամ, վայր և այլն)։ Փոխանցիր միայն փոփոխվող դաշտերը։",
+              inputSchema: z.object({
+                id: z.string().uuid(),
+                title: z.string().min(1).max(200).optional(),
+                description: z.string().max(2000).nullable().optional(),
+                starts_at: z.string().describe("ISO 8601 datetime").optional(),
+                ends_at: z.string().describe("ISO 8601 datetime").optional(),
+                kind: z.enum(["study", "project", "meeting", "quest", "other"]).optional(),
+                location: z.string().max(200).nullable().optional(),
+              }),
+              execute: async ({ id, ...patch }) => {
+                const fields = Object.fromEntries(
+                  Object.entries(patch).filter(([, v]) => v !== undefined),
+                );
+                if (!Object.keys(fields).length)
+                  return { ok: false, error: "no fields to update" };
+                const { data, error } = await supabase
+                  .from("schedule_events")
+                  .update(fields)
+                  .eq("id", id)
+                  .eq("user_id", userId)
+                  .in("source", ["manual", "ai"])
+                  .select()
+                  .maybeSingle();
+                if (error) return { ok: false, error: error.message };
+                if (!data) return { ok: false, error: "event not found or read-only" };
+                return { ok: true, event: data };
+              },
+            }),
             delete_schedule_event: tool({
               description: "Ջնջում է օրակարգային իրադարձություն ID-ով։",
               inputSchema: z.object({ id: z.string().uuid() }),
