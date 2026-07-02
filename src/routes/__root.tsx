@@ -76,18 +76,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "Lovable App" },
-      { name: "description", content: "An AI-powered platform for youth innovation, engagement, and project creation." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "An AI-powered platform for youth innovation, engagement, and project creation." },
+      { title: "Էջմիածնի Երիտասարդական Տուն" },
+      {
+        name: "description",
+        content:
+          "AI-ով աշխատող երիտասարդական հարթակ Էջմիածնի երիտասարդների համար․ նախագծեր, քվեստներ, միջոցառումներ և անհատական AI օգնական։",
+      },
+      { name: "author", content: "Էջմիածնի Երիտասարդական Տուն" },
+      { property: "og:title", content: "Էջմիածնի Երիտասարդական Տուն" },
+      {
+        property: "og:description",
+        content:
+          "AI-ով աշխատող երիտասարդական հարթակ Էջմիածնի երիտասարդների համար․ նախագծեր, քվեստներ, միջոցառումներ և անհատական AI օգնական։",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "An AI-powered platform for youth innovation, engagement, and project creation." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6607d4ff-1006-4224-9658-57f057cfa73f/id-preview-b534243e--4e6a0e91-11d8-48d5-962a-52ae7c37bff8.lovable.app-1778324348299.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6607d4ff-1006-4224-9658-57f057cfa73f/id-preview-b534243e--4e6a0e91-11d8-48d5-962a-52ae7c37bff8.lovable.app-1778324348299.png" },
+      { name: "twitter:title", content: "Էջմիածնի Երիտասարդական Տուն" },
+      {
+        name: "twitter:description",
+        content:
+          "AI-ով աշխատող երիտասարդական հարթակ Էջմիածնի երիտասարդների համար․ նախագծեր, քվեստներ, միջոցառումներ և անհատական AI օգնական։",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -137,7 +146,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
       router.invalidate();
       queryClient.invalidateQueries();
     });

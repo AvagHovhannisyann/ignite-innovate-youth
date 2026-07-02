@@ -2,11 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, tool, stepCountIs, type UIMessage } from "ai";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import {
-  createLovableAiGatewayProvider,
-  createOpenRouterProvider,
-  DEFAULT_OPENROUTER_MODEL,
-} from "@/lib/ai-gateway.server";
+import { createOpenRouterProvider, DEFAULT_OPENROUTER_MODEL } from "@/lib/ai-gateway.server";
 import { STUDENT_AGENT_SYSTEM } from "@/lib/agent-prompts";
 
 const corsHeaders = {
@@ -21,11 +17,9 @@ export const Route = createFileRoute("/api/chat")({
       OPTIONS: async () => new Response(null, { headers: corsHeaders }),
       POST: async ({ request }) => {
         try {
-          // Prefer OpenRouter (free model) when configured; fall back to the Lovable gateway.
           const openRouterKey = process.env.OPENROUTER_API_KEY;
-          const lovableKey = process.env.LOVABLE_API_KEY;
-          if (!openRouterKey && !lovableKey)
-            return new Response("Missing OPENROUTER_API_KEY / LOVABLE_API_KEY", {
+          if (!openRouterKey)
+            return new Response("Missing OPENROUTER_API_KEY", {
               status: 500,
               headers: corsHeaders,
             });
@@ -78,11 +72,9 @@ export const Route = createFileRoute("/api/chat")({
             ]);
           const contextSummary = `\n\nՈՒՍԱՆՈՂԻ ՀԱՄԱՏԵՔՍՏ՝\nՊրոֆիլ: ${JSON.stringify(profile || {})}\nԱկտիվ նախագծեր: ${JSON.stringify(projects || [])}\nՔվեսթներ: ${JSON.stringify(quests || [])}\nՕրակարգ (առաջիկա): ${JSON.stringify(schedule || [])}`;
 
-          const model = openRouterKey
-            ? createOpenRouterProvider(openRouterKey)(
-                process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL,
-              )
-            : createLovableAiGatewayProvider(lovableKey!)("google/gemini-3-flash-preview");
+          const model = createOpenRouterProvider(openRouterKey)(
+            process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL,
+          );
 
           const tools = {
             get_profile: tool({
