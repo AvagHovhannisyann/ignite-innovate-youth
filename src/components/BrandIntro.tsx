@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { useAutoplayGuard } from "@/components/remotion-autoplay";
 import logo from "@/assets/logo.png";
 
 const Player = lazy(() => import("@remotion/player").then((m) => ({ default: m.Player })));
@@ -117,15 +118,26 @@ function BrandComposition() {
 /**
  * Landing tile that hosts the Remotion player. Client-only (the player has no
  * SSR story), lazy-loaded so it costs nothing until the landing renders.
+ *
+ * `autoPlay` alone leaves the player stuck on frame 0 (background + rings,
+ * no logo/text — since those only appear via spring()) whenever the browser
+ * defers the initial play() call: backgrounded tab on load, iOS Low Power
+ * Mode throttling the rAF loop, or the lazy chunk resolving after mount. We
+ * explicitly call play(), retry with a watchdog until it's confirmed
+ * playing, restart when the tab regains visibility, and nudge on tap as a
+ * last resort — so the animation always recovers instead of freezing.
  */
 export function BrandIntroTile() {
   const [mounted, setMounted] = useState(false);
+  const playerRef = useAutoplayGuard(mounted);
+
   useEffect(() => setMounted(true), []);
 
   return (
     <div
       className="bento-tile min-[460px]:col-span-2 overflow-hidden"
       aria-label="Բրենդային անիմացիա"
+      onPointerDown={() => playerRef.current?.play()}
     >
       <div className="aspect-[21/9] w-full">
         {mounted && (
@@ -133,6 +145,7 @@ export function BrandIntroTile() {
             fallback={<div className="w-full h-full bg-gradient-hero animate-pulse-soft" />}
           >
             <Player
+              ref={playerRef}
               component={BrandComposition}
               durationInFrames={DURATION}
               fps={FPS}
@@ -143,6 +156,13 @@ export function BrandIntroTile() {
               loop
               controls={false}
               clickToPlay={false}
+              // No audio track exists — muted from the start so playback never
+              // blocks on AudioContext.resume(), which browsers refuse without
+              // a user gesture and which otherwise froze the player on frame 0.
+              initiallyMuted
+              errorFallback={() => (
+                <div className="w-full h-full bg-gradient-hero" aria-hidden="true" />
+              )}
             />
           </Suspense>
         )}

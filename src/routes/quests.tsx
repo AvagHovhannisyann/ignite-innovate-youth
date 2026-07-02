@@ -19,6 +19,7 @@ import {
   type UserQuestRow,
 } from "@/lib/quests";
 import { toast } from "sonner";
+import { burstConfettiFromElement } from "@/lib/confetti";
 import {
   Loader2,
   RefreshCw,
@@ -250,7 +251,7 @@ function QuestsPage() {
     }
   }
 
-  async function onClaimQuest(q: Quest) {
+  async function onClaimQuest(q: Quest, sourceEl?: Element) {
     if (!user || q.awarded || q.progress < q.target) return;
     setBusy(q.id);
     try {
@@ -265,7 +266,10 @@ function QuestsPage() {
       }
       const res = await claimQuestXP(q.id, q.period);
       if (res.already) toast("Արդեն ստացված է");
-      else toast.success(`+${res.xp} XP!`);
+      else {
+        if (sourceEl) burstConfettiFromElement(sourceEl);
+        toast.success(`+${res.xp} XP!`);
+      }
       await reload(user.id);
     } catch (e: any) {
       toast.error(e.message ?? "Չհաջողվեց ստանալ XP-ն");
@@ -274,11 +278,12 @@ function QuestsPage() {
     }
   }
 
-  async function onClaimReward(node: Node, key: number) {
+  async function onClaimReward(node: Node, key: number, sourceEl?: Element) {
     if (!user) return;
     setBusy(`lv-${key}`);
     try {
       await claimLevelReward(node.level, node.xp, node.reward);
+      if (sourceEl) burstConfettiFromElement(sourceEl);
       toast.success("Պարգևը ստացված է");
       setClaims(await fetchRewardClaims(user.id));
     } catch (e: any) {
@@ -402,7 +407,7 @@ function QuestsPage() {
                 q={q}
                 index={i}
                 busy={busy === q.id}
-                onClaim={() => onClaimQuest(q)}
+                onClaim={(e) => onClaimQuest(q, e.currentTarget)}
               />
             ))}
           </div>
@@ -418,7 +423,7 @@ function QuestsPage() {
                 q={q}
                 index={i}
                 busy={busy === q.id}
-                onClaim={() => onClaimQuest(q)}
+                onClaim={(e) => onClaimQuest(q, e.currentTarget)}
               />
             ))}
           </div>
@@ -454,7 +459,7 @@ function QuestsPage() {
                         current={current}
                         claimed={claimed}
                         busy={busy === `lv-${key}`}
-                        onClaim={() => onClaimReward(n, key)}
+                        onClaim={(e) => onClaimReward(n, key, e.currentTarget)}
                       />
                       {i < road.length - 1 && (
                         <div
@@ -490,7 +495,7 @@ function QuestsPage() {
                       current={current}
                       claimed={claimed}
                       busy={busy === `lv-${key}`}
-                      onClaim={() => onClaimReward(n, key)}
+                      onClaim={(e) => onClaimReward(n, key, e.currentTarget)}
                     />
                   </li>
                 );
@@ -524,7 +529,7 @@ function QuestCard({
   q: Quest;
   index: number;
   busy?: boolean;
-  onClaim?: () => void;
+  onClaim?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const done = q.progress >= q.target;
   const pct = Math.min(100, Math.round((q.progress / q.target) * 100));
@@ -628,7 +633,7 @@ function RoadNode({
   current?: boolean;
   claimed?: boolean;
   busy?: boolean;
-  onClaim?: () => void;
+  onClaim?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-3 shrink-0 w-44">
@@ -658,7 +663,7 @@ function RewardCard({
   current?: boolean;
   claimed?: boolean;
   busy?: boolean;
-  onClaim?: () => void;
+  onClaim?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <div
@@ -716,7 +721,7 @@ function RewardRow({
   current?: boolean;
   claimed?: boolean;
   busy?: boolean;
-  onClaim?: () => void;
+  onClaim?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <div
