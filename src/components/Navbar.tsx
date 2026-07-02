@@ -6,6 +6,7 @@ import { Menu, X, LogOut, Bell, Users, GraduationCap, Flame, Shield } from "luci
 import logo from "@/assets/logo.png";
 import { NotificationsDropdown } from "@/components/NotificationsDropdown";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Navbar() {
   const { user } = useAuth();
@@ -49,11 +50,13 @@ export function Navbar() {
     <>
     <header className="sticky top-0 z-40 backdrop-blur-md bg-background/80 border-b border-border">
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-3">
-        <Link to="/" className="flex items-center gap-2 font-bold tracking-tight min-w-0">
+        <Link to="/" className="flex items-center gap-2 font-bold tracking-tight min-w-0 min-h-[44px] py-1">
           <img src={logo} alt="Էջմիածնի Երիտասարդական Տուն" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0" />
           <span className="text-foreground text-sm sm:text-base hidden min-[360px]:inline min-w-0 max-w-[128px] min-[430px]:max-w-[180px] sm:max-w-none overflow-hidden text-ellipsis" style={{ whiteSpace: "nowrap" }}>
             <span className="hidden sm:inline">Էջմիածնի </span>
-            <span className="text-gradient">Երիտասարդական Տուն</span>
+            <span className="text-gradient" style={{ whiteSpace: "nowrap" }}>
+              Երիտասարդական Տուն
+            </span>
           </span>
         </Link>
 
@@ -70,6 +73,7 @@ export function Navbar() {
 
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <ThemeToggle />
           <Link to="/auth" className="hidden sm:inline-flex text-sm px-3 py-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground">Մուտք</Link>
           <Link to="/auth" search={{ mode: "signup" }} className="text-sm px-3 sm:px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 font-medium shadow-soft min-h-[44px] inline-flex items-center">Միանալ</Link>
 

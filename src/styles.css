@@ -33,8 +33,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  /* Inter/Fraunces cover Latin only; Noto Armenian companions render the
+     Armenian UI text so headings/body don't fall back to system fonts. */
+  --font-sans: "Inter", "Noto Sans Armenian", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", "Noto Serif Armenian", ui-serif, Georgia, serif;
 }
 
 :root {
@@ -80,6 +82,48 @@
   --shadow-lift: 0 30px 80px -30px oklch(0.55 0.14 235 / 0.35);
 }
 
+/* Dark theme — same brand hues (235 blue / 55 orange), inverted lightness. */
+.dark {
+  --background: oklch(0.16 0.02 250);
+  --foreground: oklch(0.93 0.012 240);
+  --card: oklch(0.205 0.025 248);
+  --card-foreground: oklch(0.93 0.012 240);
+  --popover: oklch(0.205 0.025 248);
+  --popover-foreground: oklch(0.93 0.012 240);
+  --primary: oklch(0.72 0.13 235);
+  --primary-foreground: oklch(0.13 0.03 245);
+  --primary-glow: oklch(0.8 0.11 230);
+  --secondary: oklch(0.26 0.025 246);
+  --secondary-foreground: oklch(0.9 0.012 240);
+  --muted: oklch(0.24 0.02 246);
+  --muted-foreground: oklch(0.68 0.02 240);
+  --accent: oklch(0.74 0.15 58);
+  --accent-foreground: oklch(0.16 0.05 60);
+  --accent-soft: oklch(0.28 0.04 240);
+  --accent-soft-foreground: oklch(0.8 0.08 235);
+
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.7 0.14 155);
+  --success-foreground: oklch(0.14 0.03 155);
+  --border: oklch(0.3 0.022 246);
+  --input: oklch(0.28 0.022 246);
+  --ring: oklch(0.72 0.13 235);
+
+  --gradient-hero: linear-gradient(135deg, oklch(0.52 0.13 240) 0%, oklch(0.62 0.12 230) 100%);
+  --gradient-warm: linear-gradient(135deg, oklch(0.6 0.15 55) 0%, oklch(0.68 0.13 60) 100%);
+  --gradient-brand: linear-gradient(135deg, oklch(0.58 0.13 238) 0%, oklch(0.66 0.15 55) 100%);
+  --gradient-soft: radial-gradient(1200px 600px at 10% -10%, oklch(0.3 0.06 240 / 0.55), transparent 60%),
+                   radial-gradient(900px 500px at 110% 10%, oklch(0.3 0.07 60 / 0.35), transparent 60%),
+                   linear-gradient(180deg, oklch(0.17 0.022 248) 0%, oklch(0.15 0.02 250) 100%);
+  --gradient-card: linear-gradient(160deg, oklch(0.23 0.028 248 / 0.92) 0%, oklch(0.19 0.024 248 / 0.75) 100%);
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px -12px oklch(0 0 0 / 0.5);
+  --shadow-elegant: 0 1px 2px oklch(0 0 0 / 0.3), 0 24px 60px -24px oklch(0 0 0 / 0.6);
+  --shadow-glow: 0 0 60px oklch(0.66 0.15 55 / 0.2);
+  --shadow-lift: 0 30px 80px -30px oklch(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -114,7 +158,10 @@
     min-width: 0;
   }
     :where(h1, h2, h3, h4, h5, h6, p, a, button, span, label, input, textarea, select, li) {
-    overflow-wrap: anywhere;
+    /* break-word (not anywhere): only split a word when it truly overflows its
+       line, and keep normal min-content sizing so Armenian words never break
+       mid-word in flex/grid layouts. */
+    overflow-wrap: break-word;
     word-break: normal;
       max-inline-size: 100%;
   }
@@ -132,13 +179,15 @@
       max-width: 100vw;
       overflow-x: clip;
     }
-    body {
-      padding-bottom: calc(184px + env(safe-area-inset-bottom));
+    /* Only pages that actually render the floating tab bar need the clearance. */
+    body:has(nav.mobile-tab-bar) {
+      padding-bottom: calc(112px + env(safe-area-inset-bottom));
     }
     :where(h1, h2, h3, h4, h5, h6, p, a, button, span, label, input, textarea, select, li) {
-      overflow-wrap: anywhere;
-      word-break: break-word;
-      hyphens: auto;
+      /* No `anywhere`/`hyphens: auto` here: browsers can't hyphenate Armenian,
+         so those settings chopped words at arbitrary letters. */
+      overflow-wrap: break-word;
+      word-break: normal;
       max-width: 100%;
     }
     :where(h1, h2, h3, .font-display) {
@@ -185,7 +234,7 @@
       max-width: 100%;
     }
     :where(.bg-card, .bg-gradient-card, .card-base, .card-interactive, article, section) {
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
     }
     :where([class*="max-w-7xl"], [class*="max-w-6xl"], [class*="max-w-5xl"], [class*="max-w-4xl"], [class*="max-w-3xl"], [class*="max-w-2xl"], [class*="max-w-xl"], [class*="max-w-md"]) {
       width: 100%;
@@ -242,8 +291,8 @@
 /* Phone landscape is still a phone: keep the compact mobile rhythm even when
    the CSS width crosses tablet/desktop breakpoints. */
 @media (max-width: 932px) and (max-height: 500px) and (orientation: landscape) {
-  body {
-    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  body:has(nav.mobile-tab-bar) {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
   header.sticky > div {
     height: 52px !important;
@@ -433,7 +482,7 @@
   --game-green: oklch(0.72 0.20 150);
   --game-locked: oklch(0.40 0.05 280);
 
-  font-family: "Fredoka", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Fredoka", "Noto Sans Armenian", "Inter", ui-sans-serif, system-ui, sans-serif;
   color: oklch(0.98 0.01 280);
   background:
     radial-gradient(1100px 600px at 15% -10%, oklch(0.55 0.22 300 / 0.55), transparent 60%),
@@ -442,7 +491,7 @@
     linear-gradient(180deg, var(--game-bg-1) 0%, var(--game-bg-3) 100%);
 }
 .game-theme h1, .game-theme h2, .game-theme h3, .game-theme .game-display {
-  font-family: "Fredoka", "Inter", sans-serif;
+  font-family: "Fredoka", "Noto Sans Armenian", "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -494,7 +543,7 @@
   padding: .9rem 1.4rem;
   border-radius: 1rem;
   font-weight: 700;
-  font-family: "Fredoka", sans-serif;
+  font-family: "Fredoka", "Noto Sans Armenian", sans-serif;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   background: linear-gradient(180deg, var(--game-yellow) 0%, var(--game-yellow-2) 100%);
@@ -521,7 +570,7 @@
   width: 64px; height: 64px;
   border-radius: 9999px;
   display: grid; place-items: center;
-  font-family: "Fredoka", sans-serif;
+  font-family: "Fredoka", "Noto Sans Armenian", sans-serif;
   font-weight: 700;
   font-size: 1.4rem;
   background: linear-gradient(160deg, var(--game-purple-glow), var(--game-purple));
@@ -572,4 +621,58 @@
   50% { opacity: .6; }
 }
 .animate-pulse-soft { animation: pulse-soft 2.2s ease-in-out infinite; }
+
+/* Bento tiles — interactive modules with a cursor-tracked glow (see data-glow JS). */
+.bento-tile {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border);
+  background: var(--gradient-card);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  transition: transform 400ms cubic-bezier(.2,.7,.2,1), box-shadow 400ms cubic-bezier(.2,.7,.2,1), border-color 300ms;
+}
+.bento-tile::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(420px circle at var(--glow-x, 50%) var(--glow-y, 0%), oklch(0.72 0.13 235 / 0.14), transparent 65%);
+  opacity: 0;
+  transition: opacity 350ms ease;
+  pointer-events: none;
+}
+.bento-tile:hover { border-color: color-mix(in oklab, var(--primary) 35%, var(--border)); box-shadow: var(--shadow-lift); }
+.bento-tile:hover::before { opacity: 1; }
+
+@media (hover: none) and (pointer: coarse) {
+  .bento-tile:hover { box-shadow: var(--shadow-soft); }
+}
+
+/* Demo XP bar on the landing bento — fills once on load. */
+.demo-bar {
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--secondary);
+  overflow: hidden;
+}
+.demo-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gradient-brand);
+  animation: demofill 1.6s cubic-bezier(.2,.7,.2,1) 0.4s both;
+}
+@keyframes demofill {
+  from { width: 0; }
+}
+
+/* Respect users who prefer less motion: collapse decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 

@@ -2,8 +2,31 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, Loader2, RotateCcw, Wrench, ChevronDown } from "lucide-react";
+import { MarkdownLite } from "@/lib/markdown-lite";
+import {
+  Send, Loader2, RotateCcw, ChevronDown, User as UserIcon, Calendar,
+  CalendarPlus, CalendarX, Compass, MessageCircleQuestion, Trophy, Lightbulb, Wrench,
+} from "lucide-react";
 import logo from "@/assets/logo.png";
+
+/** Friendly Armenian labels for the agent's tools — no raw internals in the UI. */
+const TOOL_META: Record<string, { label: string; icon: typeof Wrench }> = {
+  get_profile: { label: "Կարդում է քո պրոֆիլը", icon: UserIcon },
+  list_schedule: { label: "Ստուգում է օրակարգը", icon: Calendar },
+  add_schedule_event: { label: "Ավելացնում է իրադարձություն", icon: CalendarPlus },
+  delete_schedule_event: { label: "Ջնջում է իրադարձություն", icon: CalendarX },
+  list_opportunities: { label: "Փնտրում է հնարավորություններ", icon: Compass },
+  ask_admin: { label: "Հարց է ուղարկում ադմինին", icon: MessageCircleQuestion },
+  list_quests: { label: "Ստուգում է քվեսթները", icon: Trophy },
+  recommend_next_step: { label: "Մտածում է հաջորդ քայլի մասին", icon: Lightbulb },
+};
+
+const SUGGESTED_PROMPTS = [
+  "Կազմիր ինձ համար շաբաթվա պլան",
+  "Ի՞նչ նախագիծ սկսեմ իմ հետաքրքրություններով",
+  "Ցույց տուր իմ քվեսթների վիճակը",
+  "Ավելացրու ուսումնական ժամ վաղը 18:00-ին",
+];
 
 type Props = { threadId: string; initialMessages: UIMessage[]; onReset: () => void };
 
@@ -35,7 +58,9 @@ function MessageBubble({ m }: { m: UIMessage }) {
       <div className="flex-1 min-w-0 space-y-2">
         {toolParts.map((p: any, i) => <ToolBlock key={i} part={p} />)}
         {text && (
-          <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">{text}</div>
+          <div className="text-sm text-foreground break-words">
+            <MarkdownLite text={text} />
+          </div>
         )}
       </div>
     </div>
@@ -46,6 +71,9 @@ function ToolBlock({ part }: { part: any }) {
   const [open, setOpen] = useState(false);
   const name = String(part.type || "").replace(/^tool-/, "");
   const state = part.state || "input-available";
+  const meta = TOOL_META[name] || { label: name, icon: Wrench };
+  const done = state === "output-available";
+  const failed = state === "output-error";
   return (
     <div className="rounded-xl border border-border bg-secondary/40 overflow-hidden">
       <button
@@ -53,9 +81,11 @@ function ToolBlock({ part }: { part: any }) {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-secondary/70"
       >
-        <Wrench className="w-3.5 h-3.5 text-primary shrink-0" />
-        <span className="truncate">{name}</span>
-        <span className={`ml-auto text-[10px] uppercase tracking-wide ${state === "output-available" ? "text-success" : state === "output-error" ? "text-destructive" : "text-muted-foreground"}`}>{state}</span>
+        <meta.icon className={`w-3.5 h-3.5 shrink-0 ${failed ? "text-destructive" : "text-primary"}`} />
+        <span className="truncate">{meta.label}</span>
+        <span className={`ml-auto shrink-0 ${done ? "text-success" : failed ? "text-destructive" : "text-muted-foreground"}`}>
+          {done ? "✓" : failed ? "Սխալ" : <Loader2 className="w-3 h-3 animate-spin" />}
+        </span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -111,10 +141,25 @@ export function AgentChat({ threadId, initialMessages, onReset }: Props) {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
-          <div className="text-center text-sm text-muted-foreground mt-12">
-            <img src={logo} alt="" className="w-12 h-12 object-contain mx-auto mb-3 opacity-80" />
-            Բարև։ Ի՞նչ կօգնեմ այսօր։<br/>
-            <span className="text-xs">Փորձիր՝ «Կազմիր ինձ համար շաբաթվա պլան» կամ «Ի՞նչ նախագիծ սկսեմ»</span>
+          <div className="text-center mt-10 sm:mt-14">
+            <img src={logo} alt="" className="w-14 h-14 object-contain mx-auto mb-3 animate-float" />
+            <div className="font-display text-lg mb-1">Բարև։ Ի՞նչ կօգնեմ այսօր։</div>
+            <p className="text-xs text-muted-foreground mb-5">
+              Ես գիտեմ քո պրոֆիլը, օրակարգը և քվեսթները — հարցրու ինչ ուզում ես։
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 max-w-md mx-auto">
+              {SUGGESTED_PROMPTS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={!transport}
+                  onClick={() => sendMessage({ text: p }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } })}
+                  className="text-xs px-3 py-2 rounded-full border border-border bg-card/70 hover:border-primary/40 hover:bg-primary/5 transition-colors text-left"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m) => <MessageBubble key={m.id} m={m} />)}

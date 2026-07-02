@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
+import { GrowthSimulator } from "@/components/GrowthSimulator";
+import { BrandIntroTile } from "@/components/BrandIntro";
 import {
   Sparkles,
   Compass,
@@ -10,88 +13,219 @@ import {
   Trophy,
   ArrowRight,
   ArrowUpRight,
+  Check,
+  Zap,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
-    links: [{ rel: "preload", as: "image", href: logo, fetchpriority: "high" } as any],
+    links: [{ rel: "preload", as: "image", href: logo, fetchPriority: "high" } as any],
   }),
 });
 
-function Feature({ icon: Icon, title, desc, index }: any) {
+/* Cursor-tracked glow for .bento-tile elements. */
+function trackGlow(e: React.MouseEvent<HTMLElement>) {
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--glow-x", `${((e.clientX - r.left) / r.width) * 100}%`);
+  el.style.setProperty("--glow-y", `${((e.clientY - r.top) / r.height) * 100}%`);
+}
+
+/* Count-up number that starts when it scrolls into view. */
+function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        io.disconnect();
+        const start = performance.now();
+        const dur = 1200;
+        const tick = (now: number) => {
+          const p = Math.min(1, (now - start) / dur);
+          setValue(Math.round(to * (1 - Math.pow(1 - p, 3))));
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [to]);
   return (
-    <div
-      className="group relative rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 glass hover-lift animate-rise overflow-hidden min-w-0"
-      style={{ animationDelay: `${index * 70}ms` }}
-    >
-      <div className="absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-warm grid place-items-center text-accent-foreground mb-4 sm:mb-6 shadow-soft transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-        <Icon className="w-5 h-5" strokeWidth={2.25} />
-      </div>
-      <h3 className="font-display text-xl sm:text-2xl text-foreground mb-2 sm:mb-3 leading-tight break-words">{title}</h3>
-      <p className="text-[14px] sm:text-[15px] text-muted-foreground leading-relaxed">{desc}</p>
-    </div>
+    <span ref={ref}>
+      {value}
+      {suffix}
+    </span>
   );
 }
 
-function Step({ n, t, d, index }: any) {
+/* ---------- Hero bento modules (live UI previews, not static art) ---------- */
+
+function XPModule() {
   return (
-    <div
-      className="relative rounded-2xl sm:rounded-3xl p-5 sm:p-8 glass hover-lift animate-rise overflow-hidden min-w-0"
-      style={{ animationDelay: `${index * 90}ms` }}
-    >
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <span className="font-display text-4xl sm:text-5xl text-gradient leading-none">{n}</span>
-        <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full grid place-items-center bg-primary/10 text-primary transition-colors">
-          <ArrowUpRight className="w-4 h-4" />
+    <div className="bento-tile p-4 sm:p-5" onMouseMove={trackGlow}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Քո աճը
+        </span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-gradient-warm text-accent-foreground shadow-soft">
+          <Zap className="w-3 h-3" /> 240 XP
         </span>
       </div>
-      <div className="font-display text-lg sm:text-xl mb-1.5 sm:mb-2">{t}</div>
-      <p className="text-sm text-muted-foreground leading-relaxed">{d}</p>
+      <div className="font-display text-lg leading-tight mb-1">Համայնքի ներդրող</div>
+      <div className="text-[11px] text-muted-foreground mb-3">Մակարդակ 3 → 4</div>
+      <div className="demo-bar">
+        <span style={{ width: "45%" }} />
+      </div>
     </div>
   );
 }
 
+function AgentModule() {
+  return (
+    <div className="bento-tile p-4 sm:p-5 row-span-2 flex flex-col" onMouseMove={trackGlow}>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="grid place-items-center w-7 h-7 rounded-lg bg-gradient-hero text-primary-foreground">
+          <Sparkles className="w-3.5 h-3.5" />
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          AI օգնական
+        </span>
+      </div>
+      <div className="space-y-2.5 text-[13px] leading-snug flex-1">
+        <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3 py-2 w-fit">
+          Ի՞նչ նախագիծ սկսեմ։
+        </div>
+        <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-secondary px-3 py-2">
+          Քո «դիզայն» և «էկոլոգիա» հետաքրքրություններով՝ փորձիր «Կանաչ բակ» պաստառների շարքը 🌱
+        </div>
+        <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-secondary px-3 py-2">
+          Ավելացնե՞մ առաջին քայլը օրակարգիդ։
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2">
+        <span className="text-xs text-muted-foreground flex-1">Գրիր հաղորդագրություն…</span>
+        <span className="grid place-items-center w-6 h-6 rounded-lg bg-primary text-primary-foreground">
+          <ArrowRight className="w-3 h-3" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function QuestModule() {
+  const quests = [
+    { t: "Միացիր միջոցառման", done: true },
+    { t: "Թարմացրու պրոֆիլդ", done: true },
+    { t: "Սկսիր նախագիծ", done: false },
+  ];
+  return (
+    <div className="bento-tile p-4 sm:p-5" onMouseMove={trackGlow}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Այսօրվա քվեստներ
+        </span>
+        <Trophy className="w-3.5 h-3.5 text-accent" />
+      </div>
+      <ul className="space-y-2">
+        {quests.map((q) => (
+          <li key={q.t} className="flex items-center gap-2 text-[13px]">
+            <span
+              className={`grid place-items-center w-[18px] h-[18px] rounded-full border shrink-0 ${
+                q.done ? "bg-success border-success text-success-foreground" : "border-border"
+              }`}
+            >
+              {q.done && <Check className="w-3 h-3" />}
+            </span>
+            <span className={q.done ? "line-through text-muted-foreground" : ""}>{q.t}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ---------------------------- Ecosystem bento ----------------------------- */
+
+const FEATURES = [
+  {
+    icon: Compass,
+    title: "Անհատականացված AI առաջարկներ",
+    desc: "Մեկ անգամ նշիր քո հետաքրքրությունները՝ և ակնթարթորեն ստացիր քեզ համար ընտրված դասեր, միջոցառումներ ու նախագծեր։",
+    big: true,
+  },
+  {
+    icon: Lightbulb,
+    title: "AI նախագծային գաղափարներ",
+    desc: "Իրական, կոնկրետ գաղափարներ՝ առաջին քայլերի հետ միասին։",
+  },
+  {
+    icon: Rocket,
+    title: "Մեկնարկ մեկ հպումով",
+    desc: "Գործարկիր նախագիծ, հետևիր առաջընթացին, առաջ շարժվիր թիմով։",
+  },
+  {
+    icon: Trophy,
+    title: "Մակարդակներ և նշաններ",
+    desc: "Վեց մակարդակ, ինը նշան․ աճը դառնում է տեսանելի։",
+  },
+  {
+    icon: Users,
+    title: "Կրթական հնարավորություններ",
+    desc: "Աշխատանոցներ, մաստեր-դասեր, ակումբներ և համայնքային միջոցառումներ։",
+  },
+  {
+    icon: BarChart3,
+    title: "Վերլուծություններ",
+    desc: "Կազմակերպիչները տեսնում են հետաքրքրությունների միտումները՝ ավելի լավ պլանավորելու համար։",
+    big: true,
+  },
+];
 
 function Landing() {
   return (
     <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
       <Navbar />
 
-      {/* Hero */}
+      {/* Hero — asymmetric split with a live product bento on the right */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute -top-32 -left-32 w-[420px] sm:w-[520px] h-[420px] sm:h-[520px] rounded-full bg-primary/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 -right-32 w-[460px] sm:w-[560px] h-[460px] sm:h-[560px] rounded-full bg-accent/20 blur-3xl" />
 
-        <div className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pt-8 sm:pt-20 md:pt-32 pb-12 sm:pb-24 md:pb-40">
-          <div className="grid lg:grid-cols-12 gap-10 sm:gap-12 lg:gap-16 items-center">
-            <div className="lg:col-span-7 animate-rise">
-              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full glass border border-white/40 text-[11px] sm:text-xs font-medium text-foreground/80 mb-5 sm:mb-8 shadow-soft max-w-full">
+        <div className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pt-8 sm:pt-16 md:pt-24 pb-12 sm:pb-20 md:pb-28">
+          <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+            <div className="lg:col-span-6 animate-rise">
+              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full glass border border-border/60 text-[11px] sm:text-xs font-medium text-foreground/80 mb-5 sm:mb-7 shadow-soft max-w-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
                 <span className="truncate">AI-ով աշխատող երիտասարդական հարթակ</span>
               </div>
 
-              <h1 className="font-display text-[26px] min-[380px]:text-[31px] sm:text-5xl md:text-6xl lg:text-7xl xl:text-[84px] leading-[1.08] text-foreground mb-5 sm:mb-8 break-words max-w-full">
+              <h1 className="font-display text-[26px] min-[380px]:text-[31px] sm:text-5xl lg:text-5xl xl:text-[64px] leading-[1.08] text-foreground mb-5 sm:mb-7 max-w-full">
                 Տարածք
                 <br />
-                <span className="text-gradient italic font-medium">հետաքրքրա</span>
-                <br className="sm:hidden" />
-                <span className="text-gradient italic font-medium">սեր սերնդի համար։</span>
+                <span className="text-gradient italic font-medium">հետաքրքրասեր</span>
+                <br />
+                <span className="text-gradient italic font-medium">սերնդի համար։</span>
               </h1>
 
-              <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-xl leading-relaxed mb-7 sm:mb-12 break-words">
-                Հետաքրքրություններից դեպի իրական հնարավորություններ և նախագծեր․ խելացի հարթակ,
-                որտեղ Էջմիածնի երիտասարդները բացահայտում, ստեղծում և աճում են իրենց համայնքի հետ։
+              <p className="text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed mb-7 sm:mb-10">
+                Հետաքրքրություններից դեպի իրական հնարավորություններ և նախագծեր․ խելացի հարթակ, որտեղ
+                Էջմիածնի երիտասարդները բացահայտում, ստեղծում և աճում են իրենց համայնքի հետ։
               </p>
 
               <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">
                 <Link
                   to="/auth"
                   search={{ mode: "signup" }}
-                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-foreground text-background font-medium shadow-elegant hover:shadow-lift transition-all duration-300 min-h-[52px] break-words"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-foreground text-background font-medium shadow-elegant hover:shadow-lift transition-all duration-300 min-h-[52px]"
                 >
                   Միացիր հիմա
                   <span className="w-9 h-9 rounded-full bg-background/15 grid place-items-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:rotate-45">
@@ -100,128 +234,148 @@ function Landing() {
                 </Link>
                 <Link
                   to="/opportunities"
-                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 px-5 sm:px-7 py-3 rounded-full text-foreground font-medium border border-border/70 hover:border-foreground/30 hover:bg-card/60 backdrop-blur transition-all min-h-[52px] break-words"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 px-5 sm:px-7 py-3 rounded-full text-foreground font-medium border border-border/70 hover:border-foreground/30 hover:bg-card/60 backdrop-blur transition-all min-h-[52px]"
                 >
                   Բացահայտել հնարավորությունները
                   <ArrowUpRight className="w-4 h-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </Link>
               </div>
-            </div>
 
-            <div className="lg:col-span-5 relative animate-rise overflow-hidden" style={{ animationDelay: "150ms" }}>
-              <div className="relative aspect-square w-full max-w-[300px] sm:max-w-md mx-auto px-2 sm:px-0">
-                <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-card glass shadow-elegant" />
-                <div className="absolute inset-0 grid place-items-center">
-                  <img
-                    src={logo}
-                    alt="Էջմիածնի Երիտասարդական Տուն"
-                    className="w-2/3 h-2/3 object-contain animate-float drop-shadow-[0_20px_50px_rgba(43,168,224,0.35)]"
-                  />
-                </div>
-                <div className="absolute -bottom-4 left-2 sm:-bottom-6 sm:-left-6 px-4 py-3 sm:px-5 sm:py-4 rounded-2xl glass shadow-soft border border-white/40 max-w-[68%]">
-                  <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-muted-foreground mb-0.5 sm:mb-1">
-                    Անհատականացված
+              <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
+                {[
+                  { n: 6, s: "", l: "մակարդակ" },
+                  { n: 9, s: "", l: "նշան" },
+                  { n: 100, s: "%", l: "անվճար" },
+                ].map((x) => (
+                  <div key={x.l} className="flex items-baseline gap-1.5">
+                    <span className="font-display text-2xl sm:text-3xl text-gradient">
+                      <CountUp to={x.n} suffix={x.s} />
+                    </span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                      {x.l}
+                    </span>
                   </div>
-                  <div className="font-display text-sm sm:text-base leading-tight">AI-ով քեզ համար</div>
-                </div>
-                <div className="absolute -top-4 right-2 sm:-top-6 sm:-right-6 px-4 py-3 sm:px-5 sm:py-4 rounded-2xl glass shadow-soft border border-white/40 max-w-[68%]">
-                  <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-muted-foreground mb-0.5 sm:mb-1">
-                    Ստեղծված է
-                  </div>
-                  <div className="font-display text-sm sm:text-base leading-tight">Էջմիածնի երիտասարդների համար</div>
-                </div>
+                ))}
               </div>
             </div>
-          </div>
 
-          {/* Value strip */}
-          <div className="mt-14 sm:mt-24 md:mt-36 grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-4 gap-px rounded-2xl sm:rounded-3xl overflow-hidden bg-border/70 shadow-soft">
-            {[
-              { n: "AI", l: "Անհատական առաջարկներ" },
-              { n: "1 հպում", l: "Մեկնարկիր նախագիծ" },
-              { n: "Մակարդակներ", l: "Աճիր տեսանելի կերպով" },
-              { n: "Անվճար", l: "Յուրաքանչյուր ուսանողի համար" },
-            ].map((s) => (
-              <div
-                key={s.l}
-                className="bg-card/90 backdrop-blur px-4 sm:px-6 py-6 sm:py-8 md:py-10 text-center transition-colors hover:bg-card"
-              >
-                <div className="font-display text-xl sm:text-2xl md:text-3xl text-gradient mb-1.5 sm:mb-2">{s.n}</div>
-                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.18em] text-muted-foreground">
-                  {s.l}
-                </div>
+            {/* Live product bento */}
+            <div
+              className="lg:col-span-6 relative animate-rise pt-10 sm:pt-14"
+              style={{ animationDelay: "150ms" }}
+            >
+              <img
+                src={logo}
+                alt="Էջմիածնի Երիտասարդական Տուն"
+                className="absolute top-0 right-1 sm:right-2 w-14 h-14 sm:w-[72px] sm:h-[72px] object-contain animate-float drop-shadow-[0_16px_40px_rgba(43,168,224,0.35)]"
+              />
+              <div className="grid grid-cols-1 min-[460px]:grid-cols-2 gap-3 sm:gap-4">
+                <AgentModule />
+                <XPModule />
+                <QuestModule />
+                <BrandIntroTile />
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
-
-
-      {/* Features */}
-      <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 py-16 sm:py-24 md:py-40">
-        <div className="max-w-3xl mb-10 sm:mb-16 md:mb-20 min-w-0">
-          <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4 sm:mb-6">Էկոհամակարգ</div>
-          <h2 className="font-display text-2xl min-[380px]:text-3xl sm:text-4xl md:text-6xl leading-tight mb-4 sm:mb-6 break-words">
+      {/* Ecosystem — asymmetric bento, no uniform grid */}
+      <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 py-14 sm:py-20 md:py-28">
+        <div className="max-w-3xl mb-9 sm:mb-14 min-w-0">
+          <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4">
+            Էկոհամակարգ
+          </div>
+          <h2 className="font-display text-2xl min-[380px]:text-3xl sm:text-4xl md:text-5xl leading-tight mb-4">
             Ամբողջական երիտասարդական էկոհամակարգ՝
-            <span className="italic text-muted-foreground"> կառուցված քո հետաքրքրությունների շուրջ։</span>
+            <span className="italic text-muted-foreground">
+              {" "}
+              կառուցված քո հետաքրքրությունների շուրջ։
+            </span>
           </h2>
-          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-            Դասեր, միջոցառումներ, նախագծեր և համախոհների համայնք՝ կապված AI-ի միջոցով, որը սովորում է
-            քո հետաքրքրությունները և անաղմուկ բացում նոր դռներ։
-          </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-          <Feature index={0} icon={Compass} title="Անհատականացված AI առաջարկներ" desc="Մեկ անգամ նշիր քո հետաքրքրությունները՝ և ակնթարթորեն ստացիր քեզ համար ընտրված դասեր, միջոցառումներ ու նախագծեր։" />
-          <Feature index={1} icon={Lightbulb} title="AI-ով ստեղծված նախագծային գաղափարներ" desc="Իրական, կոնկրետ նախագծային գաղափարներ՝ համապատասխանեցված քո հետաքրքրություններին, առաջին քայլերի հետ միասին։" />
-          <Feature index={2} icon={Rocket} title="Նախագծերի մեկնարկ մեկ հպումով" desc="Գործարկիր նախագիծ, հետևիր առաջընթացին և թիմակիցների հետ առաջ շարժվիր։" />
-          <Feature index={3} icon={Trophy} title="Մակարդակներ և ձեռքբերումներ" desc="Վեց մակարդակ, ինը նշան․ աճը դառնում է տեսանելի՝ քո մասնակցության հետ։" />
-          <Feature index={4} icon={Users} title="Կրթական հնարավորություններ" desc="Աշխատանոցներ, մաստեր-դասեր, ակումբներ և համայնքային միջոցառումներ՝ ընտրված երիտասարդների համար։" />
-          <Feature index={5} icon={BarChart3} title="Վերլուծություններ և վիճակագրություն" desc="Կազմակերպիչները տեսնում են հետաքրքրությունների միտումներն ու AI-ով ստեղծված պատկերն՝ ավելի լավ պլանավորելու համար։" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 auto-rows-fr">
+          {FEATURES.map((f, i) => (
+            <div
+              key={f.title}
+              onMouseMove={trackGlow}
+              className={`bento-tile p-5 sm:p-7 animate-rise ${f.big ? "lg:col-span-2" : ""}`}
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-warm grid place-items-center text-accent-foreground mb-4 shadow-soft">
+                <f.icon className="w-[18px] h-[18px]" strokeWidth={2.25} />
+              </div>
+              <h3 className="font-display text-lg sm:text-xl text-foreground mb-1.5 leading-tight">
+                {f.title}
+              </h3>
+              <p className="text-[13px] sm:text-sm text-muted-foreground leading-relaxed">
+                {f.desc}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pb-24 sm:pb-28 md:pb-44">
-        <div className="grid lg:grid-cols-12 gap-6 sm:gap-12 mb-10 sm:mb-16 md:mb-20 items-end">
-          <div className="lg:col-span-7">
-            <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4 sm:mb-6">Ինչպես է աշխատում</div>
-            <h2 className="font-display text-2xl min-[380px]:text-3xl sm:text-4xl md:text-6xl leading-tight break-words">
+      {/* Growth simulator — interactive, uses the real level model */}
+      <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pb-14 sm:pb-20 md:pb-28">
+        <GrowthSimulator />
+      </section>
+
+      {/* How it works — timeline rail */}
+      <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pb-20 sm:pb-24 md:pb-32">
+        <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 items-start">
+          <div className="lg:col-span-5 lg:sticky lg:top-24">
+            <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4">
+              Ինչպես է աշխատում
+            </div>
+            <h2 className="font-display text-2xl min-[380px]:text-3xl sm:text-4xl md:text-5xl leading-tight mb-4">
               Չորս հանգիստ քայլ՝
               <br />
               <span className="italic text-muted-foreground">մեկ պայծառ ճանապարհ։</span>
             </h2>
+            <p className="text-muted-foreground text-base sm:text-lg leading-relaxed">
+              Գրանցվիր, կիսվիր քո հետաքրքրություններով, և թող հարթակը անի մնացածը։
+            </p>
           </div>
-          <p className="lg:col-span-5 text-muted-foreground text-base sm:text-lg leading-relaxed">
-            Գրանցվիր, կիսվիր քո հետաքրքրություններով, և թող հարթակը անի մնացածը։ Քո հաջորդ նախագիծը
-            կամ միջոցառումն ավելի մոտ է, քան մտածում ես։
-          </p>
+
+          <ol className="lg:col-span-7 relative space-y-4 sm:space-y-5 before:absolute before:left-[19px] before:top-3 before:bottom-3 before:w-px before:bg-gradient-to-b before:from-primary/50 before:via-accent/40 before:to-transparent">
+            {[
+              { t: "Գրանցվել", d: "Ստեղծիր քո հաշիվը մի քանի վայրկյանում։" },
+              { t: "Սկսել", d: "Ընտրիր հետաքրքրությունները, հմտություններն ու անձնական նպատակը։" },
+              {
+                t: "Ստանալ AI առաջարկներ",
+                d: "Մենք առաջարկում ենք դասեր, միջոցառումներ և նախագծեր։",
+              },
+              { t: "Սկսել նախագծեր", d: "Մեկնարկիր և աճիր ճանապարհին։" },
+            ].map((s, i) => (
+              <li
+                key={s.t}
+                className="relative flex gap-4 sm:gap-5 animate-rise"
+                style={{ animationDelay: `${i * 90}ms` }}
+              >
+                <span className="relative z-10 grid place-items-center w-10 h-10 rounded-full bg-gradient-hero text-primary-foreground font-display text-sm shadow-soft shrink-0">
+                  {i + 1}
+                </span>
+                <div className="bento-tile flex-1 p-4 sm:p-5" onMouseMove={trackGlow}>
+                  <div className="font-display text-lg mb-1">{s.t}</div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{s.d}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
-          {[
-            { n: "01", t: "Գրանցվել", d: "Ստեղծիր քո հաշիվը մի քանի վայրկյանում։" },
-            { n: "02", t: "Սկսել", d: "Ընտրիր հետաքրքրությունները, հմտություններն ու անձնական նպատակը։" },
-            { n: "03", t: "Ստանալ AI առաջարկներ", d: "Մենք առաջարկում ենք դասեր, միջոցառումներ և նախագծեր։" },
-            { n: "04", t: "Սկսել նախագծեր", d: "Մեկնարկիր և աճիր ճանապարհին։" },
-          ].map((s, i) => (
-            <Step key={s.n} {...s} index={i} />
-          ))}
-        </div>
-
-        {/* CTA card */}
-        <div className="relative mt-16 sm:mt-24 md:mt-32 overflow-hidden rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] bg-gradient-hero shadow-elegant max-w-full">
+        {/* CTA */}
+        <div className="relative mt-14 sm:mt-20 overflow-hidden rounded-2xl sm:rounded-[2rem] bg-gradient-hero shadow-elegant">
           <div className="absolute -top-20 -right-20 w-72 sm:w-80 h-72 sm:h-80 rounded-full bg-accent/40 blur-3xl" />
           <div className="absolute -bottom-24 -left-16 w-72 sm:w-80 h-72 sm:h-80 rounded-full bg-white/15 blur-3xl" />
-          <div className="relative px-4 min-[380px]:px-5 sm:px-10 md:px-16 py-7 min-[380px]:py-8 sm:py-16 md:py-24 grid md:grid-cols-12 gap-5 sm:gap-10 items-center text-primary-foreground min-w-0 overflow-hidden">
+          <div className="relative px-4 min-[380px]:px-5 sm:px-10 md:px-14 py-8 sm:py-14 grid md:grid-cols-12 gap-5 sm:gap-10 items-center text-primary-foreground">
             <div className="md:col-span-8">
-              <h3 className="font-display text-[20px] min-[380px]:text-[22px] sm:text-4xl md:text-5xl leading-tight mb-4 sm:mb-5 break-words max-w-full">
-                Քո հետաքրքրու<wbr />թյունները արժանի են
-                <br className="hidden min-[380px]:block" />
-                <span className="italic">աճելու տարածքի։</span>
+              <h3 className="font-display text-[20px] min-[380px]:text-[22px] sm:text-3xl md:text-4xl leading-tight mb-3 sm:mb-4">
+                Քո հետաքրքրությունները արժանի են <span className="italic">աճելու տարածքի։</span>
               </h3>
-              <p className="text-primary-foreground/80 text-sm min-[380px]:text-base sm:text-lg max-w-xl break-words">
+              <p className="text-primary-foreground/80 text-sm min-[380px]:text-base sm:text-lg max-w-xl">
                 Միացիր Էջմիածնի Երիտասարդական Տանը և քո սիրած զբաղմունքը դարձրու հաջորդ ձեռքբերումը։
               </p>
             </div>
@@ -229,9 +383,9 @@ function Landing() {
               <Link
                 to="/auth"
                 search={{ mode: "signup" }}
-                className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-background text-foreground font-medium shadow-elegant hover:shadow-lift transition-all duration-300 min-h-[52px] min-w-0"
+                className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-background text-foreground font-medium shadow-elegant hover:shadow-lift transition-all duration-300 min-h-[52px]"
               >
-                <span className="break-words min-w-0">Սկսել ճանապարհը</span>
+                <span className="min-w-0">Սկսել ճանապարհը</span>
                 <span className="w-9 h-9 rounded-full bg-foreground/10 grid place-items-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:rotate-45 shrink-0">
                   <ArrowRight className="w-4 h-4" />
                 </span>
@@ -241,7 +395,6 @@ function Landing() {
         </div>
       </section>
 
-
       <footer className="border-t border-border/60">
         <div className="max-w-7xl mx-auto px-5 sm:px-6 md:px-10 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div className="flex items-center gap-3">
@@ -250,17 +403,22 @@ function Landing() {
               © {new Date().getFullYear()} Էջմիածնի Երիտասարդական Տուն
             </span>
           </div>
-          <div className="flex items-center gap-5 sm:gap-6 text-sm text-muted-foreground">
-            <Link to="/opportunities" className="hover:text-foreground transition-colors">
+          <div className="flex items-center gap-2 sm:gap-3 text-sm text-muted-foreground">
+            <Link
+              to="/opportunities"
+              className="inline-flex items-center min-h-[44px] px-3 rounded-lg hover:text-foreground hover:bg-secondary/60 transition-colors"
+            >
               Հնարավորություններ
             </Link>
-            <Link to="/auth" className="hover:text-foreground transition-colors">
+            <Link
+              to="/auth"
+              className="inline-flex items-center min-h-[44px] px-3 rounded-lg hover:text-foreground hover:bg-secondary/60 transition-colors"
+            >
               Մուտք
             </Link>
           </div>
         </div>
       </footer>
-
     </div>
   );
 }

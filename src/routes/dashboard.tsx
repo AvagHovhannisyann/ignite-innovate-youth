@@ -78,29 +78,37 @@ function Dashboard() {
     <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-5 sm:py-8 pb-40 md:pb-8 overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-card border border-border rounded-2xl p-4 sm:p-6 md:p-8 shadow-soft mb-5 sm:mb-6 overflow-hidden">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+        {/* Header — greeting + XP ring bento */}
+        <div className="relative bg-gradient-card border border-border rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-soft mb-5 sm:mb-6 overflow-hidden">
+          <div className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
+          <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="min-w-0">
-              <div className="text-xs sm:text-sm text-muted-foreground">Բարի վերադարձ</div>
-              <h1 className="text-2xl sm:text-3xl font-bold mt-1 leading-tight break-words max-w-full">{profile.full_name || "Ուսանող"}</h1>
+              <div className="text-xs sm:text-sm text-muted-foreground">{greeting()}</div>
+              <h1 className="font-display text-2xl sm:text-3xl mt-1 leading-tight break-words max-w-full">{profile.full_name || "Ուսանող"}</h1>
               {profile.goal && <p className="text-sm text-muted-foreground mt-2 flex items-start gap-1.5"><Target className="w-3.5 h-3.5 mt-0.5 shrink-0" /> <span className="break-words">{profile.goal}</span></p>}
               <div className="flex flex-wrap gap-1.5 mt-3 min-w-0">
                 {(profile.interests || []).slice(0, 6).map((i: string) => (
                   <span key={i} className="max-w-full text-[11px] sm:text-xs px-2.5 py-1 rounded-full bg-accent text-accent-foreground break-words">{i}</span>
                 ))}
               </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><Rocket className="w-3.5 h-3.5 text-primary" /> {startedProjects.length} նախագիծ</span>
+                <span className="inline-flex items-center gap-1.5"><Trophy className="w-3.5 h-3.5 text-accent" /> {achievements.length} նշան</span>
+                <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-success" /> {participations.length} մասնակցություն</span>
+              </div>
             </div>
-            <div className="bg-card rounded-xl p-4 border border-border w-full md:w-auto md:min-w-[240px] shrink-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">Մակարդակ {lvl.level}</span>
-                <span className="text-xs font-semibold text-primary">{profile.xp || 0} XP</span>
+            <div className="flex items-center gap-4 shrink-0">
+              <XPRing pct={lvl.progressPct} level={lvl.level} />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-primary">{profile.xp || 0} XP</div>
+                <div className="font-semibold text-sm leading-tight">{lvl.name}</div>
+                {lvl.next && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Հաջորդը՝ {lvl.next.name}
+                    <span className="block">{lvl.next.min - (profile.xp || 0)} XP մնաց</span>
+                  </div>
+                )}
               </div>
-              <div className="font-semibold text-sm">{lvl.name}</div>
-              <div className="h-1.5 bg-secondary rounded-full mt-2 overflow-hidden">
-                <div className="h-full bg-gradient-hero transition-all duration-500" style={{ width: `${lvl.progressPct}%` }} />
-              </div>
-              {lvl.next && <div className="text-xs text-muted-foreground mt-1.5">Հաջորդը՝ {lvl.next.name}</div>}
             </div>
           </div>
         </div>
@@ -209,6 +217,45 @@ function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 6) return "Բարի գիշեր";
+  if (h < 12) return "Բարի լույս";
+  if (h < 18) return "Բարի օր";
+  return "Բարի երեկո";
+}
+
+/** Circular XP progress ring with the current level in the middle. */
+function XPRing({ pct, level }: { pct: number; level: number }) {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const filled = (Math.min(100, Math.max(0, pct)) / 100) * c;
+  return (
+    <svg width="88" height="88" viewBox="0 0 88 88" role="img" aria-label={`Մակարդակ ${level}, ${pct}% լրացված`}>
+      <defs>
+        <linearGradient id="xp-ring" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="oklch(0.68 0.14 235)" />
+          <stop offset="100%" stopColor="oklch(0.76 0.16 60)" />
+        </linearGradient>
+      </defs>
+      <circle cx="44" cy="44" r={r} fill="none" stroke="var(--secondary)" strokeWidth="8" />
+      <circle
+        cx="44" cy="44" r={r} fill="none"
+        stroke="url(#xp-ring)" strokeWidth="8" strokeLinecap="round"
+        strokeDasharray={`${filled} ${c - filled}`}
+        transform="rotate(-90 44 44)"
+        style={{ transition: "stroke-dasharray 700ms cubic-bezier(.2,.7,.2,1)" }}
+      />
+      <text x="44" y="41" textAnchor="middle" fill="var(--foreground)" fontSize="20" fontWeight="700" fontFamily="var(--font-display)">
+        {level}
+      </text>
+      <text x="44" y="57" textAnchor="middle" fill="var(--muted-foreground)" fontSize="9" letterSpacing="1">
+        ՄԱԿԱՐԴԱԿ
+      </text>
+    </svg>
   );
 }
 

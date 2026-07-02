@@ -10,7 +10,7 @@ type Mode = "signin" | "signup" | "forgot";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { mode?: Mode } => ({
     mode: (s.mode === "signup" || s.mode === "forgot" ? s.mode : "signin") as Mode,
   }),
 });
@@ -36,7 +36,7 @@ function friendlyError(msg?: string | null): string {
 }
 
 function AuthPage() {
-  const { mode: initialMode } = Route.useSearch();
+  const { mode: initialMode = "signin" } = Route.useSearch();
   const nav = useNavigate();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
@@ -230,7 +230,7 @@ function AuthPage() {
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
                   aria-label={showPw ? "Թաքցնել գաղտնաբառը" : "Ցույց տալ գաղտնաբառը"}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 grid place-items-center min-w-[44px] min-h-[44px] text-muted-foreground hover:text-foreground"
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -284,7 +284,9 @@ function AuthPage() {
             </p>
           )}
           <p className="text-xs">
-            <Link to="/" className="hover:text-foreground">← Տուն վերադառնալ</Link>
+            <Link to="/" className="inline-flex items-center justify-center min-h-[44px] px-3 hover:text-foreground">
+              ← Տուն վերադառնալ
+            </Link>
           </p>
         </div>
       </div>
