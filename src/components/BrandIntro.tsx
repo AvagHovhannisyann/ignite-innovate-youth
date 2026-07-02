@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import type { PlayerRef } from "@remotion/player";
+import { useAutoplayGuard } from "@/components/remotion-autoplay";
 import logo from "@/assets/logo.png";
 
 const Player = lazy(() => import("@remotion/player").then((m) => ({ default: m.Player })));
@@ -129,46 +129,15 @@ function BrandComposition() {
  */
 export function BrandIntroTile() {
   const [mounted, setMounted] = useState(false);
-  const playerRef = useRef<PlayerRef>(null);
-  const attemptsRef = useRef(0);
+  const playerRef = useAutoplayGuard(mounted);
 
   useEffect(() => setMounted(true), []);
-
-  const tryPlay = useCallback(() => {
-    playerRef.current?.play();
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    attemptsRef.current = 0;
-
-    const watchdog = window.setInterval(() => {
-      const player = playerRef.current;
-      if (!player) return;
-      if (player.isPlaying() || attemptsRef.current >= 8) {
-        window.clearInterval(watchdog);
-        return;
-      }
-      attemptsRef.current += 1;
-      player.play();
-    }, 500);
-
-    const onVisible = () => {
-      if (document.visibilityState === "visible") tryPlay();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      window.clearInterval(watchdog);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [mounted, tryPlay]);
 
   return (
     <div
       className="bento-tile min-[460px]:col-span-2 overflow-hidden"
       aria-label="Բրենդային անիմացիա"
-      onPointerDown={tryPlay}
+      onPointerDown={() => playerRef.current?.play()}
     >
       <div className="aspect-[21/9] w-full">
         {mounted && (

@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { GrowthSimulator } from "@/components/GrowthSimulator";
 import { BrandIntroTile } from "@/components/BrandIntro";
+import { CountUp } from "@/components/CountUp";
+import { trackGlow } from "@/lib/glow";
 import {
   Sparkles,
   Compass,
@@ -24,47 +25,6 @@ export const Route = createFileRoute("/")({
     links: [{ rel: "preload", as: "image", href: logo, fetchPriority: "high" } as any],
   }),
 });
-
-/* Cursor-tracked glow for .bento-tile elements. */
-function trackGlow(e: React.MouseEvent<HTMLElement>) {
-  const el = e.currentTarget;
-  const r = el.getBoundingClientRect();
-  el.style.setProperty("--glow-x", `${((e.clientX - r.left) / r.width) * 100}%`);
-  el.style.setProperty("--glow-y", `${((e.clientY - r.top) / r.height) * 100}%`);
-}
-
-/* Count-up number that starts when it scrolls into view. */
-function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        io.disconnect();
-        const start = performance.now();
-        const dur = 1200;
-        const tick = (now: number) => {
-          const p = Math.min(1, (now - start) / dur);
-          setValue(Math.round(to * (1 - Math.pow(1 - p, 3))));
-          if (p < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      },
-      { threshold: 0.4 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [to]);
-  return (
-    <span ref={ref}>
-      {value}
-      {suffix}
-    </span>
-  );
-}
 
 /* ---------- Hero bento modules (live UI previews, not static art) ---------- */
 
