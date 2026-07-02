@@ -44,33 +44,75 @@ export const Route = createFileRoute("/api/chat")({
             await request.json();
 
           // Build a tiny context snapshot the model sees in the system prompt.
-          const [{ data: profile }, { data: projects }, { data: quests }, { data: schedule }] =
-            await Promise.all([
-              supabase
-                .from("profiles")
-                .select("full_name,email,xp,interests,bio")
-                .eq("id", userId)
-                .maybeSingle(),
-              supabase
-                .from("started_projects")
-                .select("id,title,status,difficulty_tier")
-                .eq("user_id", userId)
-                .in("status", ["active", "submitted"])
-                .limit(10),
-              supabase
-                .from("user_quests")
-                .select("template_id,progress,awarded")
-                .eq("user_id", userId)
-                .limit(20),
-              supabase
-                .from("schedule_events")
-                .select("id,title,starts_at,ends_at,kind")
-                .eq("user_id", userId)
-                .gte("ends_at", new Date().toISOString())
-                .order("starts_at")
-                .limit(20),
-            ]);
-          const contextSummary = `\n\nՈՒՍԱՆՈՂԻ ՀԱՄԱՏԵՔՍՏ՝\nՊրոֆիլ: ${JSON.stringify(profile || {})}\nԱկտիվ նախագծեր: ${JSON.stringify(projects || [])}\nՔվեսթներ: ${JSON.stringify(quests || [])}\nՕրակարգ (առաջիկա): ${JSON.stringify(schedule || [])}`;
+          const [
+            { data: profile },
+            { data: projects },
+            { data: quests },
+            { data: schedule },
+            { data: supportThreads },
+            { count: unreadCount },
+          ] = await Promise.all([
+            supabase
+              .from("profiles")
+              .select("full_name,email,xp,interests,bio")
+              .eq("id", userId)
+              .maybeSingle(),
+            supabase
+              .from("started_projects")
+              .select("id,title,status,difficulty_tier")
+              .eq("user_id", userId)
+              .in("status", ["active", "submitted"])
+              .limit(10),
+            supabase
+              .from("user_quests")
+              .select("template_id,progress,awarded")
+              .eq("user_id", userId)
+              .limit(20),
+            supabase
+              .from("schedule_events")
+              .select("id,title,starts_at,ends_at,kind")
+              .eq("user_id", userId)
+              .gte("ends_at", new Date().toISOString())
+              .order("starts_at")
+              .limit(20),
+            // Recent AI-relayed questions to admins, so the agent can proactively
+            // relay the admin's answer back to the student in conversation instead
+            // of just leaving it in a notification the student may not open.
+            // support_threads has no `origin` column — the "[AI] " subject
+            // prefix (set by ask_admin below) is the real discriminator.
+            supabase
+              .from("support_threads")
+              .select("id,subject,status,last_message_at")
+              .eq("user_id", userId)
+              .ilike("subject", "[AI]%")
+              .order("last_message_at", { ascending: false })
+              .limit(5),
+            supabase
+              .from("notifications")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", userId)
+              .eq("read", false),
+          ]);
+
+          // Pull the admin's latest reply (if any) for each pending/answered relay thread.
+          let relayDetail = "";
+          if (supportThreads && supportThreads.length) {
+            const threadIds = supportThreads.map((t) => t.id);
+            const { data: adminReplies } = await supabase
+              .from("support_messages")
+              .select("thread_id,content,created_at")
+              .in("thread_id", threadIds)
+              .eq("sender_role", "admin")
+              .order("created_at", { ascending: false });
+            relayDetail = supportThreads
+              .map((t) => {
+                const reply = adminReplies?.find((m) => m.thread_id === t.id);
+                return `- [${t.id}] "${t.subject}" (${t.status})${reply ? ` → ադմինի պատասխան. "${reply.content}"` : " → դեռ չպատասխանված"}`;
+              })
+              .join("\n");
+          }
+
+          const contextSummary = `\n\nՈՒՍԱՆՈՂԻ ՀԱՄԱՏԵՔՍՏ՝\nՊրոֆիլ: ${JSON.stringify(profile || {})}\nԱկտիվ նախագծեր: ${JSON.stringify(projects || [])}\nՔվեսթներ: ${JSON.stringify(quests || [])}\nՕրակարգ (առաջիկա): ${JSON.stringify(schedule || [])}\nԱնընթերցված ծանուցումներ: ${unreadCount ?? 0}\nԱդմինին ուղարկված հարցեր (վերջին 5)${relayDetail ? ":\n" + relayDetail : ": չկան"}`;
 
           const model = createOpenRouterProvider(openRouterKey)(
             process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL,
@@ -202,7 +244,6 @@ export const Route = createFileRoute("/api/chat")({
                     user_id: userId,
                     subject: `[AI] ${subject}`,
                     status: "open",
-                    origin: "ai_relay",
                   })
                   .select()
                   .single();
@@ -249,6 +290,193 @@ export const Route = createFileRoute("/api/chat")({
                 hint: "Use this output internally; respond to the student conversationally with a specific recommendation.",
                 ts: new Date().toISOString(),
               }),
+            }),
+            update_profile: tool({
+              description:
+                "Խմբագրում է ուսանողի պրոֆիլի ինքնանկարագրական դաշտերը (ոչ id, email, XP, avatar)։ Փոխանցիր միայն փոփոխվող դաշտերը։",
+              inputSchema: z.object({
+                full_name: z.string().min(1).max(120).optional(),
+                bio: z.string().max(1000).nullable().optional(),
+                goal: z.string().max(500).nullable().optional(),
+                interests: z.array(z.string().max(60)).max(20).optional(),
+                skills: z.array(z.string().max(60)).max(20).optional(),
+                preferred_project_type: z.string().max(100).nullable().optional(),
+              }),
+              execute: async (patch) => {
+                const fields = Object.fromEntries(
+                  Object.entries(patch).filter(([, v]) => v !== undefined),
+                );
+                if (!Object.keys(fields).length)
+                  return { ok: false, error: "no fields to update" };
+                const { data, error } = await supabase
+                  .from("profiles")
+                  .update(fields)
+                  .eq("id", userId)
+                  .select()
+                  .maybeSingle();
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, profile: data };
+              },
+            }),
+            list_notifications: tool({
+              description: "Բերում է ուսանողի վերջին ծանուցումները (անընթերցվածները առաջին)։",
+              inputSchema: z.object({ limit: z.number().int().min(1).max(30).default(10) }),
+              execute: async ({ limit }) => {
+                const { data } = await supabase
+                  .from("notifications")
+                  .select("id,title,body,kind,read,created_at")
+                  .eq("user_id", userId)
+                  .order("read", { ascending: true })
+                  .order("created_at", { ascending: false })
+                  .limit(limit);
+                return data || [];
+              },
+            }),
+            list_my_support_threads: tool({
+              description:
+                "Բերում է ուսանողի աջակցության հարցումները (ներառյալ AI-ի կողմից ադմինին ուղարկվածները) և ադմինի պատասխանները, եթե կան։",
+              inputSchema: z.object({}),
+              execute: async () => {
+                const { data: threads } = await supabase
+                  .from("support_threads")
+                  .select("id,subject,status,last_message_at")
+                  .eq("user_id", userId)
+                  .order("last_message_at", { ascending: false })
+                  .limit(10);
+                if (!threads?.length) return [];
+                const { data: msgs } = await supabase
+                  .from("support_messages")
+                  .select("thread_id,sender_role,content,created_at")
+                  .in(
+                    "thread_id",
+                    threads.map((t) => t.id),
+                  )
+                  .order("created_at");
+                return threads.map((t) => ({
+                  ...t,
+                  messages: (msgs || []).filter((m) => m.thread_id === t.id),
+                }));
+              },
+            }),
+            join_opportunity: tool({
+              description:
+                "Գրանցում է ուսանողին հնարավորության մասնակից՝ opportunity ID-ով։ Ամսաթվով հնարավորությունները ավտոմատ ավելանում են օրակարգում։",
+              inputSchema: z.object({ opportunity_id: z.string().uuid() }),
+              execute: async ({ opportunity_id }) => {
+                const { data, error } = await supabase
+                  .from("participations")
+                  .insert({ user_id: userId, opportunity_id })
+                  .select()
+                  .single();
+                if (error) {
+                  if (error.code === "23505")
+                    return { ok: false, error: "already joined this opportunity" };
+                  return { ok: false, error: error.message };
+                }
+                return { ok: true, participation: data };
+              },
+            }),
+            list_my_projects: tool({
+              description: "Բերում է ուսանողի բոլոր նախագծերը (ակտիվ, ուղարկված, հաստատված, մերժված, չեղարկված)՝ ID-ներով։",
+              inputSchema: z.object({}),
+              execute: async () => {
+                const { data } = await supabase
+                  .from("started_projects")
+                  .select("id,title,status,difficulty_tier,progress,created_at")
+                  .eq("user_id", userId)
+                  .order("created_at", { ascending: false });
+                return data || [];
+              },
+            }),
+            start_project: tool({
+              description:
+                "Սկսում է նոր նախագիծ և ծախսում համապատասխան XP (easy=200, medium=400, hard=700)։ ՊԱՐՏԱԴԻՐ նախապես բացատրիր XP արժեքը և ստացիր ուսանողի հաստատումը, ապա միայն կանչիր confirmed=true-ով։",
+              inputSchema: z.object({
+                title: z.string().min(1).max(200),
+                short_description: z.string().max(500),
+                full_description: z.string().max(3000).optional(),
+                matching_interests: z.array(z.string()).max(10).optional(),
+                team_size: z.string().max(100).optional(),
+                first_steps: z.array(z.string()).max(10).optional(),
+                difficulty_tier: z.enum(["easy", "medium", "hard"]),
+                confirmed: z
+                  .boolean()
+                  .describe("Must be true only after the student explicitly agreed to spend the XP"),
+              }),
+              execute: async (input) => {
+                if (!input.confirmed)
+                  return { ok: false, error: "not confirmed by student yet — ask first" };
+                const { data, error } = await supabase.rpc("start_project", {
+                  _title: input.title,
+                  _short_description: input.short_description,
+                  _full_description: input.full_description || input.short_description,
+                  _matching_interests: input.matching_interests || [],
+                  _team_size: input.team_size || "",
+                  _first_steps: input.first_steps || [],
+                  _difficulty_tier: input.difficulty_tier,
+                });
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, project: data };
+              },
+            }),
+            submit_project: tool({
+              description: "Ուղարկում է ուսանողի ակտիվ նախագիծը ադմինի ստուգմանը։",
+              inputSchema: z.object({ project_id: z.string().uuid() }),
+              execute: async ({ project_id }) => {
+                const { data, error } = await supabase.rpc("submit_project", {
+                  _project_id: project_id,
+                });
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, project: data };
+              },
+            }),
+            cancel_project: tool({
+              description:
+                "Չեղարկում է ուսանողի նախագիծը։ ՊԱՐՏԱԴԻՐ նախապես հաստատում ստացիր ուսանողից, քանի որ սա անդառնալի է։",
+              inputSchema: z.object({
+                project_id: z.string().uuid(),
+                confirmed: z.boolean(),
+              }),
+              execute: async ({ project_id, confirmed }) => {
+                if (!confirmed) return { ok: false, error: "not confirmed by student yet — ask first" };
+                const { data, error } = await supabase.rpc("cancel_project", {
+                  _project_id: project_id,
+                });
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, project: data };
+              },
+            }),
+            claim_quest: tool({
+              description:
+                "Հավաքում է ավարտված քվեսթի XP-ն (միայն ապացույց չպահանջող քվեսթների համար)։",
+              inputSchema: z.object({ template_id: z.string(), period: z.string() }),
+              execute: async ({ template_id, period }) => {
+                const { data, error } = await supabase.rpc("claim_quest", {
+                  _template_id: template_id,
+                  _period: period,
+                });
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, result: data };
+              },
+            }),
+            submit_quest_evidence: tool({
+              description:
+                "Ուղարկում է տեքստային ապացույց ապացույց-պահանջող քվեսթի համար՝ ադմինի ստուգմանը (առանց մեդիա ֆայլերի, միայն նկարագրություն)։",
+              inputSchema: z.object({
+                template_id: z.string(),
+                period: z.string(),
+                content: z.string().min(5).max(2000),
+              }),
+              execute: async ({ template_id, period, content }) => {
+                const { data, error } = await supabase.rpc("submit_quest", {
+                  _template_id: template_id,
+                  _period: period,
+                  _content: content,
+                  _media: [],
+                });
+                if (error) return { ok: false, error: error.message };
+                return { ok: true, submission: data };
+              },
             }),
           };
 
