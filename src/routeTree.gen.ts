@@ -35,6 +35,9 @@ import { Route as FeedCreateRouteImport } from './routes/feed.create'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AdminQuestReviewsRouteImport } from './routes/admin.quest-reviews'
+import { Route as ApiGoogleStatusRouteImport } from './routes/api/google/status'
+import { Route as ApiGoogleConnectRouteImport } from './routes/api/google/connect'
+import { Route as ApiGoogleCallbackRouteImport } from './routes/api/google/callback'
 import { Route as ApiPublicIcsTokenRouteImport } from './routes/api/public/ics/$token'
 
 const TrendingRoute = TrendingRouteImport.update({
@@ -167,6 +170,21 @@ const AdminQuestReviewsRoute = AdminQuestReviewsRouteImport.update({
   path: '/quest-reviews',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiGoogleStatusRoute = ApiGoogleStatusRouteImport.update({
+  id: '/api/google/status',
+  path: '/api/google/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGoogleConnectRoute = ApiGoogleConnectRouteImport.update({
+  id: '/api/google/connect',
+  path: '/api/google/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
+  id: '/api/google/callback',
+  path: '/api/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicIcsTokenRoute = ApiPublicIcsTokenRouteImport.update({
   id: '/api/public/ics/$token',
   path: '/api/public/ics/$token',
@@ -200,6 +218,9 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/feed/create': typeof FeedCreateRoute
   '/projects/$id': typeof ProjectsIdRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
+  '/api/google/connect': typeof ApiGoogleConnectRoute
+  '/api/google/status': typeof ApiGoogleStatusRoute
   '/api/public/ics/$token': typeof ApiPublicIcsTokenRoute
 }
 export interface FileRoutesByTo {
@@ -229,6 +250,9 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/feed/create': typeof FeedCreateRoute
   '/projects/$id': typeof ProjectsIdRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
+  '/api/google/connect': typeof ApiGoogleConnectRoute
+  '/api/google/status': typeof ApiGoogleStatusRoute
   '/api/public/ics/$token': typeof ApiPublicIcsTokenRoute
 }
 export interface FileRoutesById {
@@ -259,6 +283,9 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/feed/create': typeof FeedCreateRoute
   '/projects/$id': typeof ProjectsIdRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
+  '/api/google/connect': typeof ApiGoogleConnectRoute
+  '/api/google/status': typeof ApiGoogleStatusRoute
   '/api/public/ics/$token': typeof ApiPublicIcsTokenRoute
 }
 export interface FileRouteTypes {
@@ -290,6 +317,9 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/feed/create'
     | '/projects/$id'
+    | '/api/google/callback'
+    | '/api/google/connect'
+    | '/api/google/status'
     | '/api/public/ics/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -319,6 +349,9 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/feed/create'
     | '/projects/$id'
+    | '/api/google/callback'
+    | '/api/google/connect'
+    | '/api/google/status'
     | '/api/public/ics/$token'
   id:
     | '__root__'
@@ -348,6 +381,9 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/feed/create'
     | '/projects/$id'
+    | '/api/google/callback'
+    | '/api/google/connect'
+    | '/api/google/status'
     | '/api/public/ics/$token'
   fileRoutesById: FileRoutesById
 }
@@ -375,6 +411,9 @@ export interface RootRouteChildren {
   TrendingRoute: typeof TrendingRoute
   ApiChatRoute: typeof ApiChatRoute
   ProjectsIdRoute: typeof ProjectsIdRoute
+  ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
+  ApiGoogleConnectRoute: typeof ApiGoogleConnectRoute
+  ApiGoogleStatusRoute: typeof ApiGoogleStatusRoute
   ApiPublicIcsTokenRoute: typeof ApiPublicIcsTokenRoute
 }
 
@@ -562,6 +601,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminQuestReviewsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/google/status': {
+      id: '/api/google/status'
+      path: '/api/google/status'
+      fullPath: '/api/google/status'
+      preLoaderRoute: typeof ApiGoogleStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google/connect': {
+      id: '/api/google/connect'
+      path: '/api/google/connect'
+      fullPath: '/api/google/connect'
+      preLoaderRoute: typeof ApiGoogleConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google/callback': {
+      id: '/api/google/callback'
+      path: '/api/google/callback'
+      fullPath: '/api/google/callback'
+      preLoaderRoute: typeof ApiGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ics/$token': {
       id: '/api/public/ics/$token'
       path: '/api/public/ics/$token'
@@ -626,6 +686,9 @@ const rootRouteChildren: RootRouteChildren = {
   TrendingRoute: TrendingRoute,
   ApiChatRoute: ApiChatRoute,
   ProjectsIdRoute: ProjectsIdRoute,
+  ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
+  ApiGoogleConnectRoute: ApiGoogleConnectRoute,
+  ApiGoogleStatusRoute: ApiGoogleStatusRoute,
   ApiPublicIcsTokenRoute: ApiPublicIcsTokenRoute,
 }
 export const routeTree = rootRouteImport

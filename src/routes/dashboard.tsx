@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { callAI } from "@/lib/ai";
 import { levelFromXP } from "@/lib/constants";
+import { fmtDayMonth, fmtTime } from "@/lib/calendar";
 import { trackGlow } from "@/lib/glow";
 import { burstConfetti } from "@/lib/confetti";
 import { CountUp } from "@/components/CountUp";
@@ -205,6 +206,8 @@ function Dashboard() {
             </div>
           </div>
         </div>
+
+        <UpNext userId={user!.id} />
 
         {/* AI status */}
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center sm:justify-between gap-3 mb-5 sm:mb-6 px-1 min-w-0">
@@ -690,6 +693,81 @@ function ProjectIdeaCard({ project, onOpen }: { project: any; onOpen: () => void
             <span className="break-words min-w-0">Բացել և սկսել</span>
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Next few calendar events; events starting within an hour get a live badge. */
+function UpNext({ userId }: { userId: string }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("schedule_events")
+      .select("id,title,starts_at,ends_at,kind,all_day,location")
+      .eq("user_id", userId)
+      .gte("ends_at", new Date().toISOString())
+      .order("starts_at")
+      .limit(3)
+      .then(({ data }) => {
+        if (!cancelled) setItems(data || []);
+      });
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [userId]);
+
+  if (!items.length) return null;
+
+  const KIND_DOT: Record<string, string> = {
+    study: "bg-blue-500",
+    project: "bg-purple-500",
+    meeting: "bg-orange-500",
+    quest: "bg-emerald-500",
+    opportunity: "bg-sky-500",
+    other: "bg-slate-500",
+  };
+
+  return (
+    <div className="mb-5 sm:mb-6 animate-rise" style={{ animationDelay: "40ms" }}>
+      <div className="flex flex-wrap gap-2 min-w-0">
+        {items.map((e) => {
+          const start = new Date(e.starts_at).getTime();
+          const minsAway = Math.round((start - now) / 60000);
+          const soon = !e.all_day && minsAway > 0 && minsAway <= 60;
+          const live = !e.all_day && minsAway <= 0;
+          return (
+            <Link
+              key={e.id}
+              to="/schedule"
+              className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 min-h-[44px] bg-card min-w-0 max-w-full transition-colors hover:border-primary/50 ${
+                soon || live ? "border-primary/50 shadow-glow" : "border-border"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${KIND_DOT[e.kind] || KIND_DOT.other}`} />
+              <span className="text-sm font-medium truncate">{e.title}</span>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {e.all_day
+                  ? fmtDayMonth(new Date(e.starts_at))
+                  : live
+                    ? "Ընթացքի մեջ"
+                    : soon
+                      ? `${minsAway} ր հետո`
+                      : `${fmtDayMonth(new Date(e.starts_at))}, ${fmtTime(new Date(e.starts_at))}`}
+              </span>
+              {(soon || live) && (
+                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+                  {live ? "Հիմա" : "Շուտով"}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
