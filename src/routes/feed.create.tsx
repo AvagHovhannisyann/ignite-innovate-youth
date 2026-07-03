@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createPost, updatePost, uploadMedia, signMedia } from "@/lib/feed";
 import { ArrowLeft, ImagePlus, Loader2, MapPin, Tag, X, Video, Send } from "lucide-react";
 
-const searchSchema = z.object({ edit: z.string().optional() });
+const searchSchema = z.object({ edit: z.string().optional(), media: z.string().optional() });
 
 export const Route = createFileRoute("/feed/create")({
   validateSearch: searchSchema,
@@ -23,6 +23,7 @@ function CreatePostPage() {
   const [content, setContent] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [location, setLocation] = useState("");
+  const [visibility, setVisibility] = useState<"students" | "connections" | "public">("students");
   const [mediaPaths, setMediaPaths] = useState<string[]>([]);
   const [mediaTypes, setMediaTypes] = useState<string[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -52,6 +53,7 @@ function CreatePostPage() {
       setContent(data.content || "");
       setTagsInput((data.tags || []).join(", "));
       setLocation(data.location || "");
+      setVisibility((data.visibility as "students" | "connections" | "public") || "students");
       setMediaPaths(data.media_urls || []);
       setMediaTypes(data.media_types || []);
       setPreviews(await signMedia(data.media_urls || []));
@@ -72,8 +74,8 @@ function CreatePostPage() {
       setMediaPaths((p) => [...p, ...newPaths]);
       setMediaTypes((t) => [...t, ...newTypes]);
       setPreviews((p) => [...p, ...signed]);
-    } catch (err: any) {
-      setError(err.message || "Չհաջողվեց վերբեռնել ֆայլը");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Չհաջողվեց վերբեռնել ֆայլը");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -109,6 +111,7 @@ function CreatePostPage() {
           media_types: mediaTypes,
           tags,
           location: location.trim() || null,
+          visibility,
         });
       } else {
         await createPost({
@@ -119,11 +122,12 @@ function CreatePostPage() {
           media_types: mediaTypes,
           tags,
           location: location.trim() || null,
+          visibility,
         });
       }
-      nav({ to: "/profile", search: { tab: "posts" } as any });
-    } catch (err: any) {
-      setError(err.message || "Չհաջողվեց ուղարկել գրառումը");
+      nav({ to: "/feed" });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Չհաջողվեց ուղարկել գրառումը");
     } finally {
       setSubmitting(false);
     }
@@ -152,7 +156,8 @@ function CreatePostPage() {
             {edit ? "Խմբագրել գրառումը" : "Նոր գրառում"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1 break-words">
-            Քո գրառումն ուղարկվում է ադմինի վերանայման։ Հաստատվելուց հետո այն կտեսնեն բոլորը։
+            Քո գրառումն ուղարկվում է ադմինի վերանայման։ Հաստատվելուց հետո այն կհայտնվի ֆիդում՝
+            մասնագիտական քննարկումների համար։
           </p>
         </header>
 
@@ -232,6 +237,23 @@ function CreatePostPage() {
                 onChange={onFiles}
               />
             </label>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Տեսանելիություն
+            </label>
+            <select
+              value={visibility}
+              onChange={(e) =>
+                setVisibility(e.target.value as "students" | "connections" | "public")
+              }
+              className="w-full px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm min-h-[44px]"
+            >
+              <option value="students">Բոլոր ուսանողները</option>
+              <option value="connections">Միայն կապերը</option>
+              <option value="public">Հանրային</option>
+            </select>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">

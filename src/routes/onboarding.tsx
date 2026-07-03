@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ALL_INTERESTS } from "@/lib/constants";
+import { upsertFeedProfile } from "@/lib/feed";
 import { Navbar } from "@/components/Navbar";
 import { ArrowRight, Loader2 } from "lucide-react";
 
@@ -39,6 +40,9 @@ function Onboarding() {
   const [learning, setLearning] = useState("");
   const [projectType, setProjectType] = useState("Projects");
   const [goal, setGoal] = useState("");
+  const [feedHeadline, setFeedHeadline] = useState("");
+  const [feedTopics, setFeedTopics] = useState<string[]>([]);
+  const [lookingFor, setLookingFor] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -75,6 +79,17 @@ function Onboarding() {
         setSaving(false);
         return;
       }
+      await upsertFeedProfile({
+        user_id: user.id,
+        headline: feedHeadline.trim() || goal.trim() || null,
+        about: bio.trim() || null,
+        avatar_url: null,
+        banner_url: null,
+        website_url: null,
+        feed_topics: feedTopics.length ? feedTopics : interests.slice(0, 8),
+        looking_for: lookingFor,
+        setup_completed: true,
+      });
       await supabase.from("notifications").insert({
         user_id: user.id,
         title: "Բարի գալուստ Էջմիածնի Երիտասարդական Տուն 🎉",
@@ -90,9 +105,9 @@ function Onboarding() {
         return;
       }
       nav({ to: "/dashboard", replace: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      alert("Ինչ-որ բան սխալ գնաց՝ " + (e?.message ?? "անհայտ սխալ"));
+      alert("Ինչ-որ բան սխալ գնաց՝ " + (e instanceof Error ? e.message : "անհայտ սխալ"));
       setSaving(false);
     }
   }
@@ -212,6 +227,62 @@ function Onboarding() {
         />
       ),
       canNext: goal.trim().length > 5,
+    },
+    {
+      title: "Ստեղծիր քո ֆիդի պրոֆիլը",
+      sub: "LinkedIn-ի նման՝ սա օգնում է մյուսներին հասկանալ, թե ինչով ես հետաքրքրված",
+      content: (
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Մասնագիտական վերնագիր</label>
+            <input
+              value={feedHeadline}
+              onChange={(e) => setFeedHeadline(e.target.value)}
+              maxLength={120}
+              placeholder="օր.՝ Ապագա դիզայներ · AI և մեդիա"
+              className="w-full min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Ինչ թեմաներ տեսնել ֆիդում</label>
+            <div className="flex flex-wrap gap-2">
+              {ALL_INTERESTS.map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggle(feedTopics, setFeedTopics, i)}
+                  className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm border transition-all break-words ${feedTopics.includes(i) ? "bg-gradient-hero text-primary-foreground border-transparent shadow-soft" : "bg-card border-border hover:border-primary/30"}`}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Ինչ ես փնտրում համայնքում</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "մենթոր",
+                "թիմակիցներ",
+                "պրակտիկա",
+                "կամավորություն",
+                "նախագծեր",
+                "միջոցառումներ",
+              ].map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggle(lookingFor, setLookingFor, i)}
+                  className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm border transition-all break-words ${lookingFor.includes(i) ? "bg-foreground text-background border-transparent" : "bg-card border-border hover:border-primary/30"}`}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ),
+      canNext: feedHeadline.trim().length >= 3 && feedTopics.length >= 3,
     },
   ];
 
