@@ -80,6 +80,7 @@ function Admin() {
   const [insights, setInsights] = useState<any>(null);
   const [insightsMeta, setInsightsMeta] = useState<any>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<Post[] | null>(null);
   const [pendingProjects, setPendingProjects] = useState<any[] | null>(null);
@@ -211,6 +212,7 @@ function Admin() {
 
   async function generateInsights() {
     setInsightsLoading(true);
+    setInsightsError(false);
     try {
       const { result, aiUsed, model, generatedAt } = await callAI("admin_insights", {
         data: {
@@ -225,6 +227,7 @@ function Admin() {
       setInsightsMeta({ aiUsed, model, generatedAt });
     } catch (e) {
       console.error(e);
+      setInsightsError(true);
     } finally {
       setInsightsLoading(false);
     }
@@ -639,6 +642,14 @@ function Admin() {
                     className={`w-1.5 h-1.5 rounded-full ${insightsMeta.aiUsed ? "bg-success" : "bg-muted-foreground"}`}
                   />
                   {insightsMeta.aiUsed ? "AI" : "Չգեներացված"}
+                </div>
+              )}
+              {insightsError && (
+                <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/25 text-xs text-destructive">
+                  <span>Չհաջողվեց գեներացնել insight-ները։</span>
+                  <button onClick={generateInsights} className="underline font-medium shrink-0">
+                    Կրկին փորձել
+                  </button>
                 </div>
               )}
               {!insights ? (

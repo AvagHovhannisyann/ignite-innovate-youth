@@ -27,6 +27,7 @@ function ProjectDetail() {
   const [started, setStarted] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [starting, setStarting] = useState(false);
   const [tab, setTab] = useState<"overview" | "chat">("overview");
   const [showSuccess, setShowSuccess] = useState(false);
@@ -62,10 +63,11 @@ function ProjectDetail() {
 
   async function loadDetail(i: any, prof: any) {
     setGenerating(true);
+    setDetailError(false);
     try {
       const { result } = await callAI("project_detail", { idea: i, profile: prof });
       setDetail(result);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setDetailError(true); }
     finally { setGenerating(false); }
   }
 
@@ -214,6 +216,19 @@ function ProjectDetail() {
         {(!started || tab === "overview") && (
           <>
             {generating && !detail && <div className="mt-6 text-center text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin inline mr-2" /> AI-ն կազմում է պլանը․․․</div>}
+
+            {detailError && !detail && !generating && (
+              <div className="mt-6 flex flex-col items-center gap-3 text-center text-sm text-muted-foreground bg-destructive/5 border border-destructive/20 rounded-xl p-6">
+                <AlertCircle className="w-5 h-5 text-destructive" />
+                <span>AI-ի հետ կապն ընդհատվեց, հավանաբար ծանրաբեռնվածության պատճառով։</span>
+                <button
+                  onClick={() => loadDetail(idea, profile)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-card border border-border hover:bg-secondary text-sm font-medium"
+                >
+                  Կրկին փորձել
+                </button>
+              </div>
+            )}
 
             {detail && (
               <div className="grid lg:grid-cols-3 gap-6 mt-6">

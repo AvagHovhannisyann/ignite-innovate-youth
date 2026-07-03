@@ -5,20 +5,27 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
 type Tab = {
-  to: string;
+  to?: string;
   label: string;
   icon: typeof Home;
   /** Elevated center "action" tab (Instagram-style create button). */
   primary?: boolean;
+  /** Non-navigating tab that triggers a global action instead of a route. */
+  action?: "search";
 };
 
 const TABS: Tab[] = [
   { to: "/dashboard", label: "Տուն", icon: Home },
-  { to: "/opportunities", label: "Որոնել", icon: Search },
+  { label: "Որոնել", icon: Search, action: "search" },
   { to: "/agent", label: "AI", icon: Sparkles, primary: true },
   { to: "/feed", label: "Ֆիդ", icon: Newspaper },
   { to: "/profile", label: "Էջ", icon: User },
 ];
+
+/** Opens the global ⌘K command palette (same trick as the desktop trigger). */
+function openCommandPalette() {
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+}
 
 // Full-screen flows where the tab bar would be in the way.
 const HIDDEN_PREFIXES = ["/auth", "/onboarding", "/reset-password"];
@@ -41,8 +48,8 @@ export function MobileTabBar() {
   if (!user) return null;
   if (HIDDEN_PREFIXES.some((p) => path === p || path.startsWith(p + "/"))) return null;
 
-  const isActive = (to: string) =>
-    path === to || (to !== "/dashboard" && path.startsWith(to + "/"));
+  const isActive = (to?: string) =>
+    !!to && (path === to || (to !== "/dashboard" && path.startsWith(to + "/")));
 
   return (
     <nav
@@ -52,10 +59,30 @@ export function MobileTabBar() {
     >
       <div className="mobile-tab-shell mx-auto w-full max-w-[calc(100vw-24px)] px-0 pb-1 pointer-events-auto">
         <ul className="relative grid grid-cols-5 items-end gap-0 rounded-[28px] bg-background/92 backdrop-blur-2xl border border-border/60 shadow-[0_16px_44px_-14px_rgba(0,0,0,0.32)] px-1.5 py-2 overflow-visible">
-          {TABS.map(({ to, label, icon: Icon, primary }) => {
+          {TABS.map(({ to, label, icon: Icon, primary, action }) => {
             const active = isActive(to);
 
-            if (primary) {
+            if (action === "search") {
+              return (
+                <li key="search-action">
+                  <button
+                    type="button"
+                    onClick={openCommandPalette}
+                    aria-label={`${label} (բացում է որոնման պատուհանը)`}
+                    className="group relative flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[48px] px-0 py-1 w-full"
+                  >
+                    <span className="grid place-items-center w-11 h-8 rounded-2xl bg-transparent group-active:bg-secondary transition-all duration-300 ease-out">
+                      <Icon className="w-5 h-5 text-muted-foreground" strokeWidth={2} />
+                    </span>
+                    <span className="text-[10px] leading-none tracking-normal text-center text-muted-foreground font-medium">
+                      {label}
+                    </span>
+                  </button>
+                </li>
+              );
+            }
+
+            if (primary && to) {
               return (
                 <li key={to} className="flex justify-center">
                   <Link
@@ -78,6 +105,8 @@ export function MobileTabBar() {
                 </li>
               );
             }
+
+            if (!to) return null;
 
             return (
               <li key={to}>

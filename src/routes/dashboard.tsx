@@ -43,6 +43,7 @@ function Dashboard() {
     generatedAt: string;
   } | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState(false);
   const [startedProjects, setStartedProjects] = useState<any[]>([]);
   const [participations, setParticipations] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
@@ -88,6 +89,13 @@ function Dashboard() {
           model: cached.source,
           generatedAt: cached.generated_at,
         });
+        // A previous generation failed and cached an empty ("not-generated")
+        // result — the AI may be healthy now, so retry once per browser
+        // session instead of leaving the student stuck on a blank section.
+        if (cached.source !== "ai" && !sessionStorage.getItem("ai-recs-retried")) {
+          sessionStorage.setItem("ai-recs-retried", "1");
+          void generate(prof);
+        }
       } else {
         void generate(prof);
       }
@@ -97,6 +105,7 @@ function Dashboard() {
   async function generate(prof = profile) {
     if (!prof || !user) return;
     setGenerating(true);
+    setGenError(false);
     try {
       const { result, aiUsed, model, generatedAt } = await callAI("recommendations", {
         profile: prof,
@@ -125,6 +134,7 @@ function Dashboard() {
       }
     } catch (e) {
       console.error(e);
+      setGenError(true);
     } finally {
       setGenerating(false);
     }
@@ -216,6 +226,20 @@ function Dashboard() {
         </div>
 
         <UpNext userId={user!.id} />
+
+        {genError && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/25 text-sm text-destructive">
+            <span>AI-ի հետ կապն ընդհատվեց, հավանաբար ծանրաբեռնվածության պատճառով։</span>
+            <button
+              onClick={() => generate()}
+              disabled={generating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/15 hover:bg-destructive/25 font-medium disabled:opacity-50 shrink-0"
+            >
+              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Կրկին փորձել
+            </button>
+          </div>
+        )}
 
         {/* AI status */}
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center sm:justify-between gap-3 mb-5 sm:mb-6 px-1 min-w-0">
