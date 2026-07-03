@@ -9,9 +9,11 @@ import { CommandCenter, CommandCenterTrigger } from "@/components/CommandCenter"
 import {
   LayoutDashboard, Calendar, Compass, Trophy, Newspaper, Users,
   Sparkles, MessageCircleQuestion, Shield, ChevronLeft, ChevronRight,
-  LogOut, HelpCircle, Bell, Menu, X,
+  LogOut, HelpCircle, Bell, Menu, X, MonitorDown,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { usePwaInstall } from "@/hooks/use-pwa";
+import { hasSeenTour, startTour } from "@/lib/tour";
 
 type NavItem = { to: string; label: string; icon: any; adminOnly?: boolean };
 
@@ -50,6 +52,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { canInstall, install } = usePwaInstall();
+
+  // First-visit guided tour: once, on the dashboard, after the shell paints.
+  useEffect(() => {
+    if (!user || isBare || hasSeenTour() || normalizedPath !== "/dashboard") return;
+    const t = setTimeout(startTour, 1200);
+    return () => clearTimeout(t);
+  }, [user, isBare, normalizedPath]);
 
   useEffect(() => {
     if (!user || isBare) { setIsAdmin(false); return; }
@@ -84,6 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             key={n.to}
             to={n.to}
+            data-tour={`nav-${n.to.slice(1)}`}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive(n.to)
                 ? "bg-primary/10 text-primary"
@@ -146,7 +157,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0"><PageTitle /></div>
-          <CommandCenterTrigger />
+          {canInstall && (
+            <button
+              type="button"
+              data-tour="install-app"
+              onClick={() => void install()}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/15 transition-colors"
+            >
+              <MonitorDown className="w-3.5 h-3.5" /> Տեղադրել
+            </button>
+          )}
+          <span data-tour="command-center" className="inline-flex"><CommandCenterTrigger /></span>
           <ThemeToggle />
           <Link to="/support" className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full hover:bg-secondary" aria-label="Օգնություն">
             <HelpCircle className="w-5 h-5 text-muted-foreground" />

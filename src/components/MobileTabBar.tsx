@@ -62,6 +62,7 @@ export function MobileTabBar() {
               <li key={to}>
                 <Link
                   to={to}
+                  data-tour={`nav-${to.slice(1)}`}
                   aria-current={active ? "page" : undefined}
                     className={`group flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[48px] rounded-2xl px-0 py-1.5 transition-colors ${
                     active ? "text-primary" : "text-muted-foreground active:text-foreground"

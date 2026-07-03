@@ -4,6 +4,7 @@ import { GrowthSimulator } from "@/components/GrowthSimulator";
 import { BrandIntroTile } from "@/components/BrandIntro";
 import { CountUp } from "@/components/CountUp";
 import { trackGlow } from "@/lib/glow";
+import { useReveal } from "@/hooks/use-reveal";
 import {
   Sparkles,
   Compass,
@@ -150,6 +151,7 @@ const FEATURES = [
 ];
 
 function Landing() {
+  useReveal();
   return (
     <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
       <Navbar />
@@ -242,7 +244,7 @@ function Landing() {
 
       {/* Ecosystem — asymmetric bento, no uniform grid */}
       <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 py-14 sm:py-20 md:py-28">
-        <div className="max-w-3xl mb-9 sm:mb-14 min-w-0">
+        <div className="max-w-3xl mb-9 sm:mb-14 min-w-0 reveal">
           <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4">
             Էկոհամակարգ
           </div>
@@ -260,8 +262,8 @@ function Landing() {
             <div
               key={f.title}
               onMouseMove={trackGlow}
-              className={`bento-tile p-5 sm:p-7 animate-rise ${f.big ? "lg:col-span-2" : ""}`}
-              style={{ animationDelay: `${i * 70}ms` }}
+              className={`bento-tile p-5 sm:p-7 reveal ${f.big ? "lg:col-span-2" : ""}`}
+              style={{ transitionDelay: `${i * 60}ms` }}
             >
               <div className="w-10 h-10 rounded-xl bg-gradient-warm grid place-items-center text-accent-foreground mb-4 shadow-soft">
                 <f.icon className="w-[18px] h-[18px]" strokeWidth={2.25} />
@@ -279,12 +281,14 @@ function Landing() {
 
       {/* Growth simulator — interactive, uses the real level model */}
       <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pb-14 sm:pb-20 md:pb-28">
-        <GrowthSimulator />
+        <div className="reveal">
+          <GrowthSimulator />
+        </div>
       </section>
 
       {/* How it works — timeline rail */}
       <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pb-20 sm:pb-24 md:pb-32">
-        <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 items-start">
+        <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 items-start reveal">
           <div className="lg:col-span-5 lg:sticky lg:top-24">
             <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4">
               Ինչպես է աշխատում
