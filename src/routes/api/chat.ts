@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, tool, stepCountIs, type UIMessage } from "ai";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { createOpenRouterProvider, DEFAULT_OPENROUTER_MODEL } from "@/lib/ai-gateway.server";
+import { createOpenRouterProvider, pickHealthyModel } from "@/lib/ai-gateway.server";
 import { STUDENT_AGENT_SYSTEM } from "@/lib/agent-prompts";
 
 const corsHeaders = {
@@ -42,6 +42,11 @@ export const Route = createFileRoute("/api/chat")({
 
           const { messages, threadId }: { messages: UIMessage[]; threadId?: string } =
             await request.json();
+
+          // Free-tier models get overloaded unpredictably — probe for a healthy
+          // one now, in parallel with the context queries below, so a single
+          // down model doesn't stall (or corrupt) the reply.
+          const modelIdPromise = pickHealthyModel(openRouterKey, process.env.OPENROUTER_MODEL);
 
           // Build a tiny context snapshot the model sees in the system prompt.
           const [
@@ -114,9 +119,7 @@ export const Route = createFileRoute("/api/chat")({
 
           const contextSummary = `\n\nՈՒՍԱՆՈՂԻ ՀԱՄԱՏԵՔՍՏ՝\nՊրոֆիլ: ${JSON.stringify(profile || {})}\nԱկտիվ նախագծեր: ${JSON.stringify(projects || [])}\nՔվեսթներ: ${JSON.stringify(quests || [])}\nՕրակարգ (առաջիկա): ${JSON.stringify(schedule || [])}\nԱնընթերցված ծանուցումներ: ${unreadCount ?? 0}\nԱդմինին ուղարկված հարցեր (վերջին 5)${relayDetail ? ":\n" + relayDetail : ": չկան"}`;
 
-          const model = createOpenRouterProvider(openRouterKey)(
-            process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL,
-          );
+          const model = createOpenRouterProvider(openRouterKey)(await modelIdPromise);
 
           const tools = {
             get_profile: tool({
