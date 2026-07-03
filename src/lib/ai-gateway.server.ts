@@ -2,21 +2,21 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
 
 /**
- * Free OpenRouter models, ordered by observed reliability, not raw size.
- * The single biggest free model (nemotron-3-ultra-550b) is frequently
- * over its shared worker-capacity limit and — under that load — has been
- * observed returning garbled, multi-language-mixed output instead of a
- * clean error. nemotron-3-super-120b is smaller but was verified live to
- * respond cleanly and supports structured output. Free-tier availability
- * shifts hour to hour, so pickHealthyModel() below probes before every
- * conversation rather than trusting a static default. Override the whole
- * chain with OPENROUTER_MODEL without touching code.
+ * Strongest free OpenRouter model with tool-calling support (largest free
+ * MoE on OpenRouter, frontier-reasoning class). It occasionally goes over
+ * its shared worker-capacity limit; when that happened it was observed
+ * returning garbled, multi-language-mixed output instead of a clean error.
+ * That's mitigated two ways, not by downgrading the default: a strict
+ * language-discipline system prompt (agent-prompts.ts) and the
+ * pickHealthyModel() probe below, which skips it automatically if it's
+ * genuinely down. Override the whole chain with OPENROUTER_MODEL without
+ * touching code.
  */
-export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
 
 /** Ordered fallback chain if the primary free model is rate-limited or down. */
 export const OPENROUTER_FALLBACK_MODELS = [
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
   "qwen/qwen3-coder:free",
   "qwen/qwen3-next-80b-a3b-instruct:free",
   "openai/gpt-oss-120b:free",

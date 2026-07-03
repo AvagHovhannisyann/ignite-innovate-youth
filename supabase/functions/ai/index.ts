@@ -6,20 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Free-tier IDs rotate and get overloaded unpredictably, so this is a
-// fallback chain (callOpenRouter tries each in order) and OPENROUTER_MODEL
-// overrides the default without a deploy. Ordered by observed reliability:
-// nemotron-3-ultra (the biggest free model) is frequently over its shared
-// worker-capacity limit and — under that load — has been observed returning
-// garbled, multi-language-mixed output instead of a clean error, so the
-// smaller-but-verified-clean nemotron-3-super goes first.
+// Strongest free model first (largest free MoE on OpenRouter); free-tier IDs
+// rotate and get overloaded unpredictably, so this is a fallback chain
+// (callOpenRouter tries each in order) and OPENROUTER_MODEL overrides the
+// default without a deploy.
 const OPENROUTER_MODEL =
-  Deno.env.get("OPENROUTER_MODEL") || "nvidia/nemotron-3-super-120b-a12b:free";
+  Deno.env.get("OPENROUTER_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b:free";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
 const FALLBACK_MODELS = [
-  "nvidia/nemotron-3-super-120b-a12b:free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
   "qwen/qwen3-coder:free",
   "qwen/qwen3-next-80b-a3b-instruct:free",
   "openai/gpt-oss-120b:free",
