@@ -33,3 +33,7 @@ dist-ssr
 
 # Vercel
 .vercel
+
+# Agent skills (installed dev tooling — not app code; restore via `npx skills add`)
+.agents/
+skills-lock.json
