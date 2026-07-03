@@ -4,8 +4,14 @@
 const CACHE = "eyh-v1";
 const STATIC_RE = /\/(assets|_build)\/|\.(png|svg|woff2?|css|js)$/;
 
-self.addEventListener("install", (e) => {
-  self.skipWaiting();
+self.addEventListener("install", () => {
+  // Don't skipWaiting automatically — a page mid-typing (chat composer, feed
+  // composer) shouldn't get yanked to a new version without warning. The
+  // client prompts the user and only then posts SKIP_WAITING.
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {

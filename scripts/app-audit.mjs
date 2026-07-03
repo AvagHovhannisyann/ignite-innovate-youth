@@ -304,6 +304,7 @@ const TABLES = {
       status: "open",
       origin: "user",
       created_at: iso(-1),
+      last_message_at: iso(-1),
     },
   ],
   support_messages: [

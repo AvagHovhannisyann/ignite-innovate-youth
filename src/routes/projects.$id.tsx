@@ -182,6 +182,17 @@ function ProjectDetail() {
               </>
             )}
             <button onClick={share} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border hover:bg-secondary font-medium min-h-[44px]"><Share2 className="w-4 h-4" /> Կիսվել</button>
+            <Link
+              to="/agent"
+              search={{
+                ask: started
+                  ? `Օգնիր ինձ «${idea.title}» նախագծի հետ․ ի՞նչ պետք է անեմ հաջորդը։`
+                  : `Պատմիր ինձ «${idea.title}» նախագծի մասին և արժե՞ սկսել այն։`,
+              }}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border text-primary hover:bg-primary/5 hover:border-primary/40 font-medium min-h-[44px] transition-colors"
+            >
+              <Sparkles className="w-4 h-4" /> Հարցնել AI-ից
+            </Link>
           </div>
 
           {profile && !started && profile.xp < TIER_COST[tier] && (

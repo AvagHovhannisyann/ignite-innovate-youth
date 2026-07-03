@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -22,7 +23,44 @@ if (typeof window !== "undefined") {
   // serves modules the SW cache rules would fight with.
   if (import.meta.env.PROD && "serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          const notify = (worker: ServiceWorker) => {
+            toast("Հասանելի է հավելվածի նոր տարբերակ", {
+              duration: Infinity,
+              action: {
+                label: "Թարմացնել",
+                onClick: () => worker.postMessage({ type: "SKIP_WAITING" }),
+              },
+            });
+          };
+          // An update was already waiting when this tab opened.
+          if (reg.waiting && reg.active) notify(reg.waiting);
+          // A new update arrived while this tab is open.
+          reg.addEventListener("updatefound", () => {
+            const fresh = reg.installing;
+            if (!fresh) return;
+            fresh.addEventListener("statechange", () => {
+              if (fresh.state === "installed" && reg.active) notify(fresh);
+            });
+          });
+          // Re-check on return to the tab — PWAs can stay open for days.
+          const recheck = () => reg.update().catch(() => {});
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") recheck();
+          });
+          window.addEventListener("focus", recheck);
+        })
+        .catch(() => {});
+
+      // Reload once the user-approved update actually takes control.
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloaded) return;
+        reloaded = true;
+        window.location.reload();
+      });
     });
   }
 }

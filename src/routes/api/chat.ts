@@ -494,6 +494,13 @@ export const Route = createFileRoute("/api/chat")({
           return result.toUIMessageStreamResponse({
             headers: corsHeaders,
             originalMessages: messages,
+            // Free-tier models can still fail mid-stream (the pickHealthyModel
+            // probe only checks before starting). Without this, the client
+            // shows the SDK's bare English default ("An error occurred.").
+            onError: (error) => {
+              console.error("chat stream error", error);
+              return "AI-ի հետ կապն ընդհատվեց, հավանաբար ծանրաբեռնվածության պատճառով։ Փորձիր կրկին մի քանի վայրկյան հետո։";
+            },
             // Persist in UIMessage shape (parts incl. tool calls) so threads
             // reload exactly as they streamed.
             onEnd: async ({ responseMessage, isAborted }) => {

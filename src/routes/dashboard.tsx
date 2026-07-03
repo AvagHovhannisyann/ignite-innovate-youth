@@ -8,6 +8,7 @@ import { levelFromXP } from "@/lib/constants";
 import { fmtDayMonth, fmtTime } from "@/lib/calendar";
 import { trackGlow } from "@/lib/glow";
 import { burstConfetti } from "@/lib/confetti";
+import { useLevelUpCelebration } from "@/hooks/use-level-up";
 import { CountUp } from "@/components/CountUp";
 import {
   Sparkles,
@@ -45,6 +46,8 @@ function Dashboard() {
   const [startedProjects, setStartedProjects] = useState<any[]>([]);
   const [participations, setParticipations] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
+
+  useLevelUpCelebration(user?.id, profile?.xp);
 
   useEffect(() => {
     if (loading) return;
@@ -189,7 +192,12 @@ function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-4 shrink-0">
+            <Link
+              to="/profile"
+              hash="xp-history"
+              className="flex items-center gap-4 shrink-0 rounded-2xl -m-2 p-2 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+              title="Տես XP պատմությունը"
+            >
               <XPRing pct={lvl.progressPct} level={lvl.level} />
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-primary">
@@ -203,7 +211,7 @@ function Dashboard() {
                   </div>
                 )}
               </div>
-            </div>
+            </Link>
           </div>
         </div>
 

@@ -32,7 +32,23 @@ const NAV: NavItem[] = [
 function PageTitle() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const match = NAV.find((n) => path.startsWith(n.to));
-  return <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">{match?.label || ""}</h1>;
+  // `overflow-wrap: break-word` is set on <body> (styles.css) as an app-wide
+  // safety net so long Armenian words never overflow normal page content —
+  // but it's an *inherited* property, so it reaches this title regardless of
+  // element type. Combined with `truncate`'s `white-space: nowrap`, browsers
+  // force a wrap to avoid overflow instead of ellipsizing on one line. This
+  // header bar has fixed height and must never wrap, so reassert `normal`
+  // inline (wins over the inherited value regardless of cascade layers).
+  return (
+    <div
+      role="heading"
+      aria-level={1}
+      className="text-base sm:text-lg font-semibold text-foreground truncate"
+      style={{ overflowWrap: "normal" }}
+    >
+      {match?.label || ""}
+    </div>
+  );
 }
 
 // Routes that should always render full-bleed (no app shell) even when signed in.
