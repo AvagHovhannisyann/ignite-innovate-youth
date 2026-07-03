@@ -45,6 +45,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -297,6 +298,7 @@ function AuthPage() {
                     type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyUp={(e) => setCapsOn(e.getModifierState?.("CapsLock") ?? false)}
                     required
                     minLength={6}
                     autoComplete={isSignup ? "new-password" : "current-password"}
@@ -311,7 +313,12 @@ function AuthPage() {
                     {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {isSignup && <p className="text-xs text-muted-foreground mt-1.5">Առնվազն 6 նիշ։</p>}
+                {capsOn && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">
+                    ⇪ Caps Lock-ը միացված է
+                  </p>
+                )}
+                {isSignup && <PasswordStrength password={password} />}
               </div>
             )}
 
@@ -385,6 +392,37 @@ function AuthPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Live password strength meter for signup — heuristic, no dependency. */
+function PasswordStrength({ password }: { password: string }) {
+  if (!password) return <p className="text-xs text-muted-foreground mt-1.5">Առնվազն 6 նիշ։</p>;
+  let score = 0;
+  if (password.length >= 6) score++;
+  if (password.length >= 10) score++;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^a-zA-Z0-9]/.test(password)) score++;
+  const level = Math.min(3, Math.floor((score / 5) * 4)); // 0..3
+  const LABEL = ["Թույլ", "Միջին", "Լավ", "Ուժեղ"];
+  const COLOR = ["bg-destructive", "bg-amber-500", "bg-lime-500", "bg-success"];
+  const TEXT = ["text-destructive", "text-amber-600 dark:text-amber-400", "text-lime-600 dark:text-lime-400", "text-success"];
+  return (
+    <div className="mt-1.5">
+      <div className="flex gap-1">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors ${i <= level ? COLOR[level] : "bg-secondary"}`}
+          />
+        ))}
+      </div>
+      <p className={`text-xs mt-1 ${TEXT[level]}`}>
+        {LABEL[level]}
+        {level < 2 && " — փորձիր ավելացնել թվեր, մեծատառ կամ նշան"}
+      </p>
     </div>
   );
 }

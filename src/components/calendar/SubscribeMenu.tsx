@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { CalendarCheck, Copy, Check, ExternalLink } from "lucide-react";
+import { CalendarCheck, Copy, Check, ExternalLink, QrCode } from "lucide-react";
 
 /**
  * One-click calendar subscription. The ICS feed is read-only and keeps the
@@ -9,9 +9,20 @@ import { CalendarCheck, Copy, Check, ExternalLink } from "lucide-react";
  */
 export function SubscribeMenu({ httpsUrl }: { httpsUrl: string }) {
   const [copied, setCopied] = useState(false);
-  if (!httpsUrl) return null;
+  const [showQr, setShowQr] = useState(false);
+  const [qr, setQr] = useState("");
 
   const webcal = httpsUrl.replace(/^https?:\/\//, "webcal://");
+
+  // Lazy-generate the QR only when opened — keeps `qrcode` out of the main bundle.
+  useEffect(() => {
+    if (!showQr || qr || !httpsUrl) return;
+    import("qrcode").then((QR) =>
+      QR.toDataURL(webcal, { width: 220, margin: 1 }).then(setQr).catch(() => {}),
+    );
+  }, [showQr, qr, webcal, httpsUrl]);
+
+  if (!httpsUrl) return null;
   const google = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`;
   const outlook = `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(
     httpsUrl,
@@ -56,6 +67,25 @@ export function SubscribeMenu({ httpsUrl }: { httpsUrl: string }) {
           {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
           Պատճենել հղումը
         </button>
+        <button className={item} onClick={() => setShowQr((v) => !v)}>
+          <QrCode className="w-4 h-4" /> QR՝ հեռախոսի համար
+        </button>
+        {showQr && (
+          <div className="p-2 grid place-items-center">
+            {qr ? (
+              <img
+                src={qr}
+                alt="Օրացույցի բաժանորդագրության QR"
+                className="rounded-lg border border-border bg-white p-1 w-[180px] h-[180px]"
+              />
+            ) : (
+              <div className="w-[180px] h-[180px] rounded-lg bg-secondary animate-pulse" />
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
+              Սկանավորիր հեռախոսով՝ օրացույցին բաժանորդագրվելու համար
+            </p>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

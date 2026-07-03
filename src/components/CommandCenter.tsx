@@ -125,6 +125,17 @@ export function CommandCenter() {
             <Sparkles /> Հարցրու AI օգնականին
           </CommandItem>
           <CommandItem
+            value="Ուղեցույց շրջայց tour guide"
+            onSelect={() =>
+              run(() => {
+                nav({ to: "/dashboard" });
+                setTimeout(() => import("@/lib/tour").then((m) => m.startTour()), 600);
+              })
+            }
+          >
+            <Compass /> Ցույց տուր հարթակը (շրջայց)
+          </CommandItem>
+          <CommandItem
             value="Լուսավոր թեմա light theme"
             onSelect={() => run(() => applyTheme("light"))}
           >
