@@ -561,7 +561,17 @@ async function auditRoute(context, route, vp, findings) {
   }
 }
 
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+// This sandbox requires ALL outbound traffic through a pre-configured agent
+// proxy (HTTPS_PROXY) — Chromium doesn't pick that up on its own, so without
+// an explicit proxy option it can't reach any real destination (local dev
+// server or live internet) and every navigation fails. Route through the
+// proxy for real hosts; bypass it for loopback, since the proxy doesn't
+// forward to the sandbox's own dev server.
+const upstreamProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
+const browser = await chromium.launch({
+  executablePath: "/opt/pw-browsers/chromium",
+  proxy: upstreamProxy ? { server: upstreamProxy, bypass: "127.0.0.1,localhost" } : undefined,
+});
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const findings = [];
 for (const vp of VIEWPORTS) {
