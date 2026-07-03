@@ -337,7 +337,12 @@ export function PostCard({
               ))}
             </ul>
           )}
-          {currentUserId && (
+          {currentUserId && post.status !== "approved" && (
+            <p className="text-xs text-muted-foreground pb-2">
+              Մեկնաբանությունները հասանելի կլինեն հաստատվելուց հետո։
+            </p>
+          )}
+          {currentUserId && post.status === "approved" && (
             <form onSubmit={submitComment} className="flex items-center gap-2 pb-1">
               <input
                 value={draft}
