@@ -43,6 +43,24 @@
       "skillPath": "interaction-design/skills/animation-principles/SKILL.md",
       "computedHash": "09ee44becaf8d48638166a9af1d09bf041c2d7fa74496740a2cac05f9cdd0225"
     },
+    "banner-design": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/banner-design/SKILL.md",
+      "computedHash": "82c86217829268afd1f86e89390270e35cb3a1761854a0bbe6180929614ae022"
+    },
+    "brand": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/brand/SKILL.md",
+      "computedHash": "3c7acb846082f9e4cc873f1cf85bd57ade027206e18c7c050797f815e3a56af7"
+    },
+    "brandkit": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/brandkit/SKILL.md",
+      "computedHash": "b63012f3c3d21197e0185d3e9cc7ec40c589fb10e0b5a32a561739de31aa3f20"
+    },
     "business-design": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -151,6 +169,12 @@
       "skillPath": "ui-design/skills/data-visualization/SKILL.md",
       "computedHash": "640f408d628fa774fd6300038bc555248159f0e60387aff374f00c620254535d"
     },
+    "design": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/design/SKILL.md",
+      "computedHash": "4e0412d29df74e6153e4944b367459a28cf52e3e81c7f45c1ecf4c2a8b21907c"
+    },
     "design-brief": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -174,6 +198,12 @@
       "sourceType": "github",
       "skillPath": "design-ops/skills/design-impact-reporting/SKILL.md",
       "computedHash": "7ed0305fd11f93a0a49205d7bceb79ac5dc815a25e5f051b1d881630f35334c4"
+    },
+    "design-motion-principles": {
+      "source": "kylezantos/design-motion-principles",
+      "sourceType": "github",
+      "skillPath": "skills/design-motion-principles/SKILL.md",
+      "computedHash": "6410c1844f511249f11f38d30d217cfecf7f595f45a868d74284b6380bab47d7"
     },
     "design-negotiation": {
       "source": "Owl-Listener/designer-skills",
@@ -211,6 +241,12 @@
       "skillPath": "design-ops/skills/design-sprint-plan/SKILL.md",
       "computedHash": "f94271fe118b951469c173bdd57694c524416d6947a3ed853fc230d5d1320ece"
     },
+    "design-system": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/design-system/SKILL.md",
+      "computedHash": "a05715299135276628f53519484e1267ec8ad111e6355a09c2da1cf66aee2cc3"
+    },
     "design-system-adoption": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -222,6 +258,18 @@
       "sourceType": "github",
       "skillPath": "design-systems/skills/design-system-governance/SKILL.md",
       "computedHash": "9ff33c8a07cf03e1dfd6122b641b132d1903a86f78a7846ace1aa569a27d1b57"
+    },
+    "design-taste-frontend": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "6d838b246d0e35d0b53f4f23f98ba7a1dd561937e64f7d0c7553b0928e376c3e"
+    },
+    "design-taste-frontend-v1": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill-v1/SKILL.md",
+      "computedHash": "d704ab912c4d0ca954ffa858983da755ae4cd5cad9ba22554db5557382f5bd34"
     },
     "design-token": {
       "source": "Owl-Listener/designer-skills",
@@ -295,11 +343,23 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
     },
+    "full-output-enforcement": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/output-skill/SKILL.md",
+      "computedHash": "26bd29ce4c5e02c7666b2d503609bf466bd32290822e91f0e984147048dbb924"
+    },
     "gesture-patterns": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
       "skillPath": "interaction-design/skills/gesture-patterns/SKILL.md",
       "computedHash": "43222e5ddb8dd80e2a304c021442409707e27400cce6ea8cd7795473d8f0d7c8"
+    },
+    "gpt-taste": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/gpt-tasteskill/SKILL.md",
+      "computedHash": "cc8f0c601d8240a124e1d11634351a2be7b8a72fd807c75e5b6bf7afcd5ddee0"
     },
     "guardrail-design": {
       "source": "Owl-Listener/ai-design-skills",
@@ -325,6 +385,12 @@
       "skillPath": "interaction-design/skills/hicks-law/SKILL.md",
       "computedHash": "2f891c2d624466bfe9314435c604b3e2ddab1991b146957d712f72dbb1fcb563"
     },
+    "high-end-visual-design": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/soft-skill/SKILL.md",
+      "computedHash": "7db385e4c5370e5a7fca9704a1361b056e4504ea6a03924bb86f33a4f00b5c73"
+    },
     "icon-system": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -336,6 +402,36 @@
       "sourceType": "github",
       "skillPath": "ui-design/skills/illustration-style/SKILL.md",
       "computedHash": "e132ebf617da8d26df00cd21e80ed7ec76b32debb5bd3816248a090e634ad653"
+    },
+    "image-to-code": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/image-to-code-skill/SKILL.md",
+      "computedHash": "58517b03b2a01f4c9ba65861559d03df931400871bbc200978c975b24bb92c73"
+    },
+    "imagegen-frontend-mobile": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/imagegen-frontend-mobile/SKILL.md",
+      "computedHash": "9ab7f4f6ce66a3cff02bbf5894e5bd5af50bf5d6ef0adffdc88e8fab772fe44f"
+    },
+    "imagegen-frontend-web": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/imagegen-frontend-web/SKILL.md",
+      "computedHash": "65f5ae59fa317567809438310b1c54f78cd133426deb43e4d3d4ca4c8f541628"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "7463775a7569482158c83807f614da305bc45f006e1504993a21f5cfe434f86d"
+    },
+    "industrial-brutalist-ui": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/brutalist-skill/SKILL.md",
+      "computedHash": "8fc355c4aadb7d29c53ca28bc41be3cd6eea765d121e3737c4dc2d0f90a8effa"
     },
     "information-architecture": {
       "source": "Owl-Listener/designer-skills",
@@ -415,6 +511,12 @@
       "skillPath": "interaction-design/skills/millers-law/SKILL.md",
       "computedHash": "73a3cbaab532ce70677f456e47c0ef04b0993e23bc531c98b6dcec67c5570e57"
     },
+    "minimalist-ui": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/minimalist-skill/SKILL.md",
+      "computedHash": "08873a3131d3be27bef9bf3304b310b16b44ca6e3561aebe532797be3443f6bd"
+    },
     "motion-system": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -481,6 +583,12 @@
       "skillPath": "ui-design/skills/readable-measure/SKILL.md",
       "computedHash": "71f35ee197a7c40d2dca1328643078accc6876fc98ed9336f5a2e88023fcd348"
     },
+    "redesign-existing-projects": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/redesign-skill/SKILL.md",
+      "computedHash": "b405eee0e0e80fc243f731d9aa368bca307e356db7e6157d27101d369dac6726"
+    },
     "remotion-best-practices": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
@@ -511,6 +619,12 @@
       "skillPath": "ux-strategy/skills/service-blueprint/SKILL.md",
       "computedHash": "d1756dad664ea5efb71a948828326cce067462e1d88c0000c4101b27e2d06032"
     },
+    "slides": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/slides/SKILL.md",
+      "computedHash": "c72a8bcd2ee98a7caab8f00a816c7e7ccfa46bba6682539db2186e71220155f1"
+    },
     "spacing-system": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -528,6 +642,12 @@
       "sourceType": "github",
       "skillPath": "interaction-design/skills/state-machine/SKILL.md",
       "computedHash": "3de657494be27db1b785f65454063053c6e61ce825c86c7022fdbe6adc1557c1"
+    },
+    "stitch-design-taste": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/stitch-skill/SKILL.md",
+      "computedHash": "13322f38406cd3abf16ba45e35bdc9b18002d0153a79b4612b97aefc65d5a335"
     },
     "summarize-interview": {
       "source": "Owl-Listener/designer-skills",
@@ -576,6 +696,18 @@
       "sourceType": "github",
       "skillPath": "ui-design/skills/typography-scale/SKILL.md",
       "computedHash": "2ab442a62f1ecc618ab4458a29372c88c5ec3f904209b358003772d96a99a9f9"
+    },
+    "ui-styling": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-styling/SKILL.md",
+      "computedHash": "c5263c6dd5078d826da829036c2abd3249685e38dae40991a4763b3157017c27"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "b0f78bc58cc5a3ac68afdf6f2de214e147b09a3f8686447cb3804a921fa198c2"
     },
     "usability-test-plan": {
       "source": "Owl-Listener/designer-skills",
