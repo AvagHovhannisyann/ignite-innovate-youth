@@ -121,7 +121,7 @@ function ProjectDetail() {
     catch { alert(window.location.href); }
   }
 
-  if (authLoading || !idea) return <div className="min-h-screen grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  if (authLoading || !idea) return <div className="min-h-dvh grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   const status: ProjectStatus | null = started?.status || null;
   const isMember = !!started && !!user && participants.some((p) => p.user_id === user.id);
@@ -131,7 +131,7 @@ function ProjectDetail() {
   const reward = TIER_REWARD[tier];
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-5xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-6 sm:py-8 pb-32 md:pb-8">
         <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 min-h-[44px]"><ChevronLeft className="w-4 h-4 shrink-0" /> Վերադառնալ վահանակ</Link>

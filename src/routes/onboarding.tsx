@@ -273,7 +273,7 @@ function Onboarding() {
 
   if (loading || !user)
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -281,7 +281,7 @@ function Onboarding() {
   const cur = steps[step];
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-2xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-6 sm:py-12 pb-8">
         <div className="flex items-center gap-2 mb-4">

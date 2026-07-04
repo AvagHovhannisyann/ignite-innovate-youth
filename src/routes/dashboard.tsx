@@ -148,7 +148,7 @@ function Dashboard() {
 
   if (loading || !profile)
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -156,7 +156,7 @@ function Dashboard() {
   const lvl = levelFromXP(profile.xp || 0);
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-5 sm:py-8 pb-40 md:pb-8 overflow-hidden">
         {/* Header — greeting + XP ring bento */}
@@ -188,15 +188,15 @@ function Dashboard() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
                   <Rocket className="w-3.5 h-3.5 text-primary" />{" "}
                   <CountUp to={startedProjects.length} eager /> նախագիծ
                 </span>
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
                   <Trophy className="w-3.5 h-3.5 text-accent" />{" "}
                   <CountUp to={achievements.length} eager /> նշան
                 </span>
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
                   <Calendar className="w-3.5 h-3.5 text-success" />{" "}
                   <CountUp to={participations.length} eager /> մասնակցություն
                 </span>
@@ -210,14 +210,14 @@ function Dashboard() {
             >
               <XPRing pct={lvl.progressPct} level={lvl.level} />
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-primary">
+                <div className="text-xs font-semibold text-primary tabular-nums">
                   <CountUp to={profile.xp || 0} eager suffix=" XP" />
                 </div>
                 <div className="font-semibold text-sm leading-tight">{lvl.name}</div>
                 {lvl.next && (
                   <div className="text-xs text-muted-foreground mt-1">
                     Հաջորդը՝ {lvl.next.name}
-                    <span className="block">{lvl.next.min - (profile.xp || 0)} XP մնաց</span>
+                    <span className="block"><span className="tabular-nums">{lvl.next.min - (profile.xp || 0)}</span> XP մնաց</span>
                   </div>
                 )}
               </div>

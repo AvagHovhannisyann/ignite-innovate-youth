@@ -153,7 +153,7 @@ const FEATURES = [
 function Landing() {
   useReveal();
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-[100dvh] bg-gradient-soft overflow-x-hidden">
       <Navbar />
 
       {/* Hero — asymmetric split with a live product bento on the right */}
@@ -173,9 +173,9 @@ function Landing() {
               <h1 className="font-display text-[26px] min-[380px]:text-[31px] sm:text-5xl lg:text-5xl xl:text-[64px] leading-[1.08] text-foreground mb-5 sm:mb-7 max-w-full">
                 Տարածք
                 <br />
-                <span className="text-gradient italic font-medium">հետաքրքրասեր</span>
+                <span className="text-primary italic font-medium">հետաքրքրասեր</span>
                 <br />
-                <span className="text-gradient italic font-medium">սերնդի համար։</span>
+                <span className="text-primary italic font-medium">սերնդի համար։</span>
               </h1>
 
               <p className="text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed mb-7 sm:mb-10">
@@ -187,7 +187,7 @@ function Landing() {
                 <Link
                   to="/auth"
                   search={{ mode: "signup" }}
-                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-foreground text-background font-medium shadow-elegant hover:shadow-lift transition-all duration-300 min-h-[52px]"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-foreground text-background font-medium shadow-elegant hover:shadow-lift active:scale-[0.99] transition-all duration-300 min-h-[52px]"
                 >
                   Միացիր հիմա
                   <span className="w-9 h-9 rounded-full bg-background/15 grid place-items-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:rotate-45">
@@ -196,7 +196,7 @@ function Landing() {
                 </Link>
                 <Link
                   to="/opportunities"
-                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 px-5 sm:px-7 py-3 rounded-full text-foreground font-medium border border-border/70 hover:border-foreground/30 hover:bg-card/60 backdrop-blur transition-all min-h-[52px]"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 px-5 sm:px-7 py-3 rounded-full text-foreground font-medium border border-border/70 hover:border-foreground/30 hover:bg-card/60 active:scale-[0.99] backdrop-blur transition-all min-h-[52px]"
                 >
                   Բացահայտել հնարավորությունները
                   <ArrowUpRight className="w-4 h-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -210,7 +210,7 @@ function Landing() {
                   { n: 100, s: "%", l: "անվճար" },
                 ].map((x) => (
                   <div key={x.l} className="flex items-baseline gap-1.5">
-                    <span className="font-display text-2xl sm:text-3xl text-gradient">
+                    <span className="font-display text-2xl sm:text-3xl text-primary tabular-nums">
                       <CountUp to={x.n} suffix={x.s} />
                     </span>
                     <span className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -245,8 +245,11 @@ function Landing() {
       {/* Ecosystem — asymmetric bento, no uniform grid */}
       <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 py-14 sm:py-20 md:py-28">
         <div className="max-w-3xl mb-9 sm:mb-14 min-w-0 reveal">
-          <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4">
-            Էկոհամակարգ
+          <div className="flex items-center gap-3 mb-4">
+            <span className="h-px w-8 bg-primary/60" aria-hidden />
+            <span className="font-display italic text-sm sm:text-base text-primary">
+              Էկոհամակարգ
+            </span>
           </div>
           <h2 className="font-display text-2xl min-[380px]:text-3xl sm:text-4xl md:text-5xl leading-tight mb-4">
             Ամբողջական երիտասարդական էկոհամակարգ՝
@@ -290,8 +293,11 @@ function Landing() {
       <section className="relative max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 md:px-10 pb-20 sm:pb-24 md:pb-32">
         <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 items-start reveal">
           <div className="lg:col-span-5 lg:sticky lg:top-24">
-            <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-primary mb-4">
-              Ինչպես է աշխատում
+            <div className="flex items-center gap-3 mb-4">
+              <span className="h-px w-8 bg-primary/60" aria-hidden />
+              <span className="font-display italic text-sm sm:text-base text-primary">
+                Ինչպես է աշխատում
+              </span>
             </div>
             <h2 className="font-display text-2xl min-[380px]:text-3xl sm:text-4xl md:text-5xl leading-tight mb-4">
               Չորս հանգիստ քայլ՝
@@ -347,7 +353,7 @@ function Landing() {
               <Link
                 to="/auth"
                 search={{ mode: "signup" }}
-                className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-background text-foreground font-medium shadow-elegant hover:shadow-lift transition-all duration-300 min-h-[52px]"
+                className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 pl-5 sm:pl-7 pr-2.5 sm:pr-3 py-3 rounded-full bg-background text-foreground font-medium shadow-elegant hover:shadow-lift active:scale-[0.99] transition-all duration-300 min-h-[52px]"
               >
                 <span className="min-w-0">Սկսել ճանապարհը</span>
                 <span className="w-9 h-9 rounded-full bg-foreground/10 grid place-items-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:rotate-45 shrink-0">

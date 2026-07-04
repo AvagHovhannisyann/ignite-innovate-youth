@@ -235,14 +235,14 @@ function Admin() {
 
   if (loading || isAdmin === null)
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-dvh bg-gradient-soft">
         <Navbar />
         <div className="max-w-md mx-auto px-4 py-20 text-center card-base p-8 mt-10">
           <ShieldAlert className="w-10 h-10 text-primary mx-auto mb-3" />
@@ -257,7 +257,7 @@ function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-6 sm:py-8 pb-32 md:pb-8">
         <header className="mb-8 animate-rise min-w-0">
@@ -737,7 +737,7 @@ function KPI({ icon: Icon, label, value, hint }: any) {
         <Icon className="w-3.5 h-3.5 shrink-0" />{" "}
         <span className="break-words min-w-0">{label}</span>
       </div>
-      <div className="text-2xl md:text-3xl font-bold mt-2 text-gradient font-display break-words">
+      <div className="text-2xl md:text-3xl font-bold mt-2 text-primary tabular-nums font-display break-words">
         {value}
       </div>
       {hint && <div className="text-[11px] text-muted-foreground mt-1 break-words">{hint}</div>}

@@ -297,7 +297,7 @@ function QuestsPage() {
 
   if (loading || !profile) {
     return (
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-dvh bg-gradient-soft">
         <Navbar />
         <PageLoader />
       </div>
@@ -310,7 +310,7 @@ function QuestsPage() {
   const currentXP = profile.xp || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-6 sm:py-10 pb-32 md:pb-10">

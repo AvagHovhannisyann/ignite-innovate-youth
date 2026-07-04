@@ -201,7 +201,7 @@ function ProfilePage() {
 
   if (loading || !profile) {
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -215,7 +215,7 @@ function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-6xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-5 sm:py-10 pb-32 md:pb-10">
         {/* Header */}

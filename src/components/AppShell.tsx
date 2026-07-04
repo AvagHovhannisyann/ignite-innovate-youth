@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {(!collapsed || inDrawer) && (
             <span className="font-display font-bold text-sm leading-tight truncate">
               <span className="block">Էջմիածնի</span>
-              <span className="block text-gradient">Երիտ. Տուն</span>
+              <span className="block text-primary">Երիտ. Տուն</span>
             </span>
           )}
         </Link>
@@ -137,7 +137,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-dvh bg-gradient-soft">
       {/* Desktop sidebar (fixed so it never scrolls with content) */}
       <aside
         className={`hidden md:flex flex-col bg-background border-r border-border fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ${collapsed ? "w-[72px]" : "w-64"}`}
