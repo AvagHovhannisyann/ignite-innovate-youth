@@ -17,7 +17,7 @@ export type Post = {
   updated_at: string;
   approved_at: string | null;
   // Hydrated:
-  author?: { full_name: string | null; email: string | null } | null;
+  author?: { full_name: string | null; email: string | null; xp?: number | null } | null;
   signed_media?: { url: string; type: string }[];
   like_count?: number;
   comment_count?: number;
@@ -39,7 +39,7 @@ async function hydrate(posts: any[], currentUserId: string | null): Promise<Post
   const ids = posts.map((p) => p.id);
 
   const [{ data: profs }, { data: likes }, { data: comments }, { data: myLikes }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email").in("id", authorIds),
+    supabase.from("profiles").select("id, full_name, email, xp").in("id", authorIds),
     supabase.from("post_likes").select("post_id").in("post_id", ids),
     supabase.from("post_comments").select("post_id").in("post_id", ids),
     currentUserId
@@ -81,6 +81,19 @@ export async function fetchApprovedFeed(currentUserId: string | null, limit = 30
     .limit(limit);
   if (error) throw error;
   return hydrate(data || [], currentUserId);
+}
+
+/** The signed-in user's own not-yet-approved posts, to pin above the feed. */
+export async function fetchMyPending(userId: string): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("author_id", userId)
+    .in("status", ["pending", "rejected"])
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error) throw error;
+  return hydrate(data || [], userId);
 }
 
 export async function fetchMyPosts(userId: string): Promise<Post[]> {

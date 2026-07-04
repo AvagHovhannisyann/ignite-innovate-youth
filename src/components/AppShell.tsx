@@ -32,7 +32,23 @@ const NAV: NavItem[] = [
 function PageTitle() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const match = NAV.find((n) => path.startsWith(n.to));
-  return <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">{match?.label || ""}</h1>;
+  // `overflow-wrap: break-word` is set on <body> (styles.css) as an app-wide
+  // safety net so long Armenian words never overflow normal page content —
+  // but it's an *inherited* property, so it reaches this title regardless of
+  // element type. Combined with `truncate`'s `white-space: nowrap`, browsers
+  // force a wrap to avoid overflow instead of ellipsizing on one line. This
+  // header bar has fixed height and must never wrap, so reassert `normal`
+  // inline (wins over the inherited value regardless of cascade layers).
+  return (
+    <div
+      role="heading"
+      aria-level={1}
+      className="text-base sm:text-lg font-semibold text-foreground truncate"
+      style={{ overflowWrap: "normal" }}
+    >
+      {match?.label || ""}
+    </div>
+  );
 }
 
 // Routes that should always render full-bleed (no app shell) even when signed in.
@@ -84,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {(!collapsed || inDrawer) && (
             <span className="font-display font-bold text-sm leading-tight truncate">
               <span className="block">Էջմիածնի</span>
-              <span className="block text-gradient">Երիտ. Տուն</span>
+              <span className="block text-primary">Երիտ. Տուն</span>
             </span>
           )}
         </Link>
@@ -121,7 +137,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-dvh bg-gradient-soft">
       {/* Desktop sidebar (fixed so it never scrolls with content) */}
       <aside
         className={`hidden md:flex flex-col bg-background border-r border-border fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ${collapsed ? "w-[72px]" : "w-64"}`}

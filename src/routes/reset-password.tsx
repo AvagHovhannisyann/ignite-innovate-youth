@@ -40,7 +40,7 @@ function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-dvh bg-gradient-soft">
       <Navbar />
       <div className="max-w-md mx-auto px-4 py-16">
         <div className="text-center mb-8">

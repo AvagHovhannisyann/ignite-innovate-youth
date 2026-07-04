@@ -80,6 +80,7 @@ function Admin() {
   const [insights, setInsights] = useState<any>(null);
   const [insightsMeta, setInsightsMeta] = useState<any>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<Post[] | null>(null);
   const [pendingProjects, setPendingProjects] = useState<any[] | null>(null);
@@ -211,6 +212,7 @@ function Admin() {
 
   async function generateInsights() {
     setInsightsLoading(true);
+    setInsightsError(false);
     try {
       const { result, aiUsed, model, generatedAt } = await callAI("admin_insights", {
         data: {
@@ -225,6 +227,7 @@ function Admin() {
       setInsightsMeta({ aiUsed, model, generatedAt });
     } catch (e) {
       console.error(e);
+      setInsightsError(true);
     } finally {
       setInsightsLoading(false);
     }
@@ -232,14 +235,14 @@ function Admin() {
 
   if (loading || isAdmin === null)
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-dvh bg-gradient-soft">
         <Navbar />
         <div className="max-w-md mx-auto px-4 py-20 text-center card-base p-8 mt-10">
           <ShieldAlert className="w-10 h-10 text-primary mx-auto mb-3" />
@@ -254,7 +257,7 @@ function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-6 sm:py-8 pb-32 md:pb-8">
         <header className="mb-8 animate-rise min-w-0">
@@ -641,6 +644,14 @@ function Admin() {
                   {insightsMeta.aiUsed ? "AI" : "Չգեներացված"}
                 </div>
               )}
+              {insightsError && (
+                <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/25 text-xs text-destructive">
+                  <span>Չհաջողվեց գեներացնել insight-ները։</span>
+                  <button onClick={generateInsights} className="underline font-medium shrink-0">
+                    Կրկին փորձել
+                  </button>
+                </div>
+              )}
               {!insights ? (
                 <p className="text-sm text-muted-foreground">
                   Generate insights to see AI-powered recommendations for next programs.
@@ -726,7 +737,7 @@ function KPI({ icon: Icon, label, value, hint }: any) {
         <Icon className="w-3.5 h-3.5 shrink-0" />{" "}
         <span className="break-words min-w-0">{label}</span>
       </div>
-      <div className="text-2xl md:text-3xl font-bold mt-2 text-gradient font-display break-words">
+      <div className="text-2xl md:text-3xl font-bold mt-2 text-primary tabular-nums font-display break-words">
         {value}
       </div>
       {hint && <div className="text-[11px] text-muted-foreground mt-1 break-words">{hint}</div>}

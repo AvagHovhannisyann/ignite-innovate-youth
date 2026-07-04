@@ -65,7 +65,7 @@ function SupportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-3xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-5 sm:py-8 pb-40 md:pb-10">
         <div className="mb-5">

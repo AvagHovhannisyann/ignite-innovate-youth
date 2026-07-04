@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ALL_INTERESTS } from "@/lib/constants";
 import { Navbar } from "@/components/Navbar";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Plus, X, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
 
@@ -36,6 +36,8 @@ function Onboarding() {
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
+  const [showCustomSkill, setShowCustomSkill] = useState(false);
+  const [customSkill, setCustomSkill] = useState("");
   const [learning, setLearning] = useState("");
   const [projectType, setProjectType] = useState("Projects");
   const [goal, setGoal] = useState("");
@@ -47,6 +49,15 @@ function Onboarding() {
 
   function toggle(arr: string[], setArr: (v: string[]) => void, item: string) {
     setArr(arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]);
+  }
+
+  function addCustomSkill() {
+    const v = customSkill.trim();
+    if (!v) return;
+    if (!skills.some((s) => s.toLowerCase() === v.toLowerCase())) {
+      setSkills((prev) => [...prev, v]);
+    }
+    setCustomSkill("");
   }
 
   async function finish() {
@@ -154,17 +165,62 @@ function Onboarding() {
     {
       title: "Ի՞նչ հմտություններ ունես արդեն",
       content: (
-        <div className="flex flex-wrap gap-2">
-          {SKILLS.map((s) => (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {SKILLS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggle(skills, setSkills, s)}
+                className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm border transition-all break-words ${skills.includes(s) ? "bg-gradient-hero text-primary-foreground border-transparent" : "bg-card border-border hover:border-primary/30"}`}
+              >
+                {s}
+              </button>
+            ))}
+            {/* Custom skills the student typed in manually. */}
+            {skills
+              .filter((s) => !SKILLS.includes(s))
+              .map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggle(skills, setSkills, s)}
+                  className="min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm border border-transparent bg-gradient-hero text-primary-foreground break-words"
+                >
+                  {s} <X className="w-3.5 h-3.5" />
+                </button>
+              ))}
             <button
-              key={s}
               type="button"
-              onClick={() => toggle(skills, setSkills, s)}
-              className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm border transition-all break-words ${skills.includes(s) ? "bg-gradient-hero text-primary-foreground border-transparent" : "bg-card border-border hover:border-primary/30"}`}
+              onClick={() => setShowCustomSkill((v) => !v)}
+              className={`min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm border transition-all ${showCustomSkill ? "border-primary text-primary bg-primary/5" : "bg-card border-border border-dashed hover:border-primary/30"}`}
             >
-              {s}
+              <Plus className="w-3.5 h-3.5" /> Այլ
             </button>
-          ))}
+          </div>
+          {showCustomSkill && (
+            <div className="flex items-center gap-2 animate-rise">
+              <input
+                autoFocus
+                value={customSkill}
+                onChange={(e) => setCustomSkill(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); addCustomSkill(); }
+                }}
+                maxLength={40}
+                placeholder="Գրիր քո հմտությունը…"
+                className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm"
+              />
+              <button
+                type="button"
+                onClick={addCustomSkill}
+                disabled={!customSkill.trim()}
+                className="shrink-0 min-h-[44px] px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+              >
+                Ավելացնել
+              </button>
+            </div>
+          )}
         </div>
       ),
       canNext: true,
@@ -217,7 +273,7 @@ function Onboarding() {
 
   if (loading || !user)
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -225,10 +281,10 @@ function Onboarding() {
   const cur = steps[step];
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-2xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-6 sm:py-12 pb-8">
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 mb-4">
           {steps.map((_, i) => (
             <div
               key={i}
@@ -236,6 +292,12 @@ function Onboarding() {
             />
           ))}
         </div>
+        {step === 0 && (
+          <div className="flex items-center gap-2.5 mb-4 px-3.5 py-2.5 rounded-xl bg-primary/5 border border-primary/15 text-xs text-muted-foreground animate-rise">
+            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+            Այս պատասխանները քո անձնական AI մենթորը կօգտագործի՝ քեզ հարմար նախագծեր, դասընթացներ և հնարավորություններ առաջարկելու համար։
+          </div>
+        )}
         <div className="card-base rounded-2xl p-4 sm:p-6 md:p-8 shadow-elegant overflow-hidden animate-rise">
           <div className="text-xs text-muted-foreground mb-2">
             Քայլ {step + 1} / {steps.length}

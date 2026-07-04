@@ -35,7 +35,7 @@ function Community() {
   }, [user, loading, nav]);
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-4xl mx-auto px-3 min-[380px]:px-4 py-6 sm:py-8 pb-32 md:pb-8">
         <header className="mb-8 animate-rise min-w-0">

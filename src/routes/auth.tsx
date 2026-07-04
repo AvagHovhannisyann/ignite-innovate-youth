@@ -182,7 +182,7 @@ function AuthPage() {
   const isSignup = mode === "signup";
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-md lg:max-w-6xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-8 sm:py-12 pb-28 md:pb-12 lg:grid lg:grid-cols-2 lg:gap-12 xl:gap-16 lg:items-stretch">
         {/* Animated product tour — tablet/desktop only */}

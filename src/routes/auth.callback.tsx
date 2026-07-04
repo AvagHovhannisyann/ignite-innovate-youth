@@ -33,7 +33,7 @@ function CallbackPage() {
   }, [nav]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-soft">
+    <div className="min-h-dvh flex items-center justify-center bg-gradient-soft">
       <div className="text-center">
         <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-hero items-center justify-center text-primary-foreground shadow-elegant mb-4 animate-pulse">
           <Sparkles className="w-6 h-6" />

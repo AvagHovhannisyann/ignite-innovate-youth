@@ -6,10 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Strongest free OpenRouter models first; free-tier IDs rotate, so the list
-// is a fallback chain and OPENROUTER_MODEL overrides the default without a deploy.
-// Verified live against the OpenRouter catalog: largest free tool-capable
-// model (frontier MoE), confirmed to return valid JSON under response_format.
+// Strongest free model first (largest free MoE on OpenRouter); free-tier IDs
+// rotate and get overloaded unpredictably, so this is a fallback chain
+// (callOpenRouter tries each in order) and OPENROUTER_MODEL overrides the
+// default without a deploy.
 const OPENROUTER_MODEL =
   Deno.env.get("OPENROUTER_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b:free";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");

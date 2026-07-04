@@ -1,16 +1,25 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AgentChat } from "@/components/AgentChat";
 import { Loader2, RefreshCw } from "lucide-react";
 import type { UIMessage } from "ai";
 
-export const Route = createFileRoute("/agent")({ component: AgentPage });
+// Other pages deep-link here with a prefilled question, e.g. from an
+// opportunity card's "Հարցնել AI-ից" button — /agent?ask=...
+const searchSchema = z.object({ ask: z.string().optional() });
+
+export const Route = createFileRoute("/agent")({
+  component: AgentPage,
+  validateSearch: searchSchema,
+});
 
 function AgentPage() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const { ask } = Route.useSearch();
   const [threadId, setThreadId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [ready, setReady] = useState(false);
@@ -78,7 +87,14 @@ function AgentPage() {
           </button>
         </div>
       ) : threadId ? (
-        <AgentChat key={threadId} threadId={threadId} initialMessages={initialMessages} onReset={resetThread} />
+        <AgentChat
+          key={threadId}
+          threadId={threadId}
+          initialMessages={initialMessages}
+          onReset={resetThread}
+          autoAsk={ask}
+          onAutoAskSent={() => nav({ to: "/agent", search: {}, replace: true })}
+        />
       ) : null}
     </div>
   );

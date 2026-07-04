@@ -33,3 +33,8 @@ dist-ssr
 
 # Vercel
 .vercel
+
+# Agent skills — .agents/ is the installed content (not app code, restore
+# with the commands in skills-lock.json); the lockfile itself is tracked so
+# any session can restore the same skill set with one command each.
+.agents/

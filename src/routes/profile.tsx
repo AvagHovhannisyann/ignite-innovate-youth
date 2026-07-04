@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
@@ -29,6 +29,7 @@ import {
   Award,
   Coins,
   LifeBuoy,
+  X,
 } from "lucide-react";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
@@ -65,6 +66,20 @@ function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
   const [rank, setRank] = useState<any>(null);
+  const [questAwards, setQuestAwards] = useState<any[]>([]);
+  const [showCustomSkill, setShowCustomSkill] = useState(false);
+  const [customSkill, setCustomSkill] = useState("");
+
+  function addCustomSkill() {
+    const v = customSkill.trim();
+    if (!v) return;
+    setProfile((p: any) => {
+      const cur: string[] = p.skills || [];
+      if (cur.some((s) => s.toLowerCase() === v.toLowerCase())) return p;
+      return { ...p, skills: [...cur, v] };
+    });
+    setCustomSkill("");
+  }
 
   async function loadMyPosts(uid: string) {
     try {
@@ -81,28 +96,36 @@ function ProfilePage() {
       return;
     }
     (async () => {
-      const [{ data: prof }, { data: parts }, { data: sp }, { data: ach }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase
-          .from("participations")
-          .select("*, opportunities(title,category,date)")
-          .eq("user_id", user.id)
-          .order("joined_at", { ascending: false }),
-        supabase
-          .from("started_projects")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("achievements")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("earned_at", { ascending: false }),
-      ]);
+      const [{ data: prof }, { data: parts }, { data: sp }, { data: ach }, { data: qa }] =
+        await Promise.all([
+          supabase.from("profiles").select("*").eq("id", user.id).single(),
+          supabase
+            .from("participations")
+            .select("*, opportunities(title,category,date)")
+            .eq("user_id", user.id)
+            .order("joined_at", { ascending: false }),
+          supabase
+            .from("started_projects")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("achievements")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("earned_at", { ascending: false }),
+          supabase
+            .from("user_quests")
+            .select("template_id,awarded_at,quest_templates(title,xp)")
+            .eq("user_id", user.id)
+            .eq("awarded", true)
+            .order("awarded_at", { ascending: false }),
+        ]);
       setProfile(prof || { id: user.id, email: user.email, interests: [], skills: [] });
       setParticipations(parts || []);
       setStartedProjects(sp || []);
       setAchievements(ach || []);
+      setQuestAwards(qa || []);
       void loadMyPosts(user.id);
       fetchUserRank(user.id)
         .then(setRank)
@@ -146,9 +169,39 @@ function ProfilePage() {
     setTimeout(() => setStatus(null), 3500);
   }
 
+  // Real XP ledger, derived from existing per-project/per-quest reward columns
+  // — no separate transactions table needed. Must run before the early
+  // return below so hook order stays consistent across renders.
+  const xpHistory = useMemo(() => {
+    type Entry = { date: string; label: string; amount: number; icon: any };
+    const out: Entry[] = [];
+    for (const p of startedProjects) {
+      if (p.xp_cost) {
+        out.push({ date: p.created_at, label: `Սկսվեց՝ «${p.title}»`, amount: -p.xp_cost, icon: Rocket });
+      }
+      if (p.status === "approved" && p.approved_at) {
+        const award = p.quality === "exceptional" ? p.xp_reward_exceptional : p.xp_reward_standard;
+        if (award) {
+          out.push({
+            date: p.approved_at,
+            label: p.quality === "exceptional" ? `Բացառիկ՝ «${p.title}»` : `Հաստատվեց՝ «${p.title}»`,
+            amount: award,
+            icon: CheckCircle2,
+          });
+        }
+      }
+    }
+    for (const q of questAwards) {
+      const tpl = q.quest_templates;
+      if (!tpl?.xp || !q.awarded_at) continue;
+      out.push({ date: q.awarded_at, label: `Քվեսթ՝ «${tpl.title}»`, amount: tpl.xp, icon: Award });
+    }
+    return out.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [startedProjects, questAwards]);
+
   if (loading || !profile) {
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -162,7 +215,7 @@ function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-6xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-5 sm:py-10 pb-32 md:pb-10">
         {/* Header */}
@@ -363,7 +416,49 @@ function ProfilePage() {
                     </button>
                   );
                 })}
+                {(profile.skills || [])
+                  .filter((s: string) => !SKILLS.includes(s))
+                  .map((s: string) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => toggle("skills", s)}
+                      className="min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm border border-transparent bg-foreground text-background break-words"
+                    >
+                      {s} <X className="w-3 h-3" />
+                    </button>
+                  ))}
+                <button
+                  type="button"
+                  onClick={() => setShowCustomSkill((v) => !v)}
+                  className={`min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm border transition-all ${showCustomSkill ? "border-primary text-primary bg-primary/5" : "bg-card border-border border-dashed hover:border-primary/30"}`}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Այլ
+                </button>
               </div>
+              {showCustomSkill && (
+                <div className="flex items-center gap-2 mt-2.5 animate-rise">
+                  <input
+                    autoFocus
+                    value={customSkill}
+                    onChange={(e) => setCustomSkill(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); addCustomSkill(); }
+                    }}
+                    maxLength={40}
+                    placeholder="Գրիր քո հմտությունը…"
+                    className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomSkill}
+                    disabled={!customSkill.trim()}
+                    className="shrink-0 min-h-[44px] px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                  >
+                    Ավելացնել
+                  </button>
+                </div>
+              )}
             </Section>
 
             <div className="sticky bottom-28 md:bottom-4 z-10 flex flex-col min-[420px]:flex-row items-stretch min-[420px]:items-center justify-between gap-3 card-base rounded-2xl p-3 sm:p-4 shadow-elegant overflow-hidden">
@@ -496,6 +591,39 @@ function ProfilePage() {
               )}
             </Section>
 
+            <Section id="xp-history" title="XP պատմություն" subtitle="Որտեղից է եկել և ուր է գնացել քո XP-ն" icon={Coins}>
+              {xpHistory.length === 0 ? (
+                <EmptyState icon={Coins} text="XP փոփոխություններ դեռ չկան։ Ավարտիր քվեսթ կամ սկսիր նախագիծ։" />
+              ) : (
+                <ul className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+                  {xpHistory.map((e, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-secondary/50 min-w-0"
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${
+                          e.amount >= 0 ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        <e.icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{e.label}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {new Date(e.date).toLocaleDateString("hy-AM", { day: "numeric", month: "short", year: "numeric" })}
+                        </div>
+                      </div>
+                      <div className={`text-sm font-semibold shrink-0 tabular-nums ${e.amount >= 0 ? "text-success" : "text-muted-foreground"}`}>
+                        {e.amount >= 0 ? "+" : ""}
+                        {e.amount} XP
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+
             <Section title="Իմ գրառումները" icon={MessageSquare}>
               <Link
                 to="/feed/create"
@@ -593,9 +721,9 @@ function Field({ label, hint, children, className = "" }: any) {
   );
 }
 
-function Section({ title, subtitle, icon: Icon, children }: any) {
+function Section({ id, title, subtitle, icon: Icon, children }: any) {
   return (
-    <section className="card-base rounded-2xl p-4 sm:p-6 overflow-hidden min-w-0">
+    <section id={id} className="card-base rounded-2xl p-4 sm:p-6 overflow-hidden min-w-0 scroll-mt-20">
       <div className="flex items-start gap-2.5 mb-4">
         <div className="w-8 h-8 rounded-lg bg-accent text-accent-foreground grid place-items-center shrink-0">
           <Icon className="w-4 h-4" />

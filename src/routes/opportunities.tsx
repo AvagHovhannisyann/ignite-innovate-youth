@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { EmptyState } from "@/components/PageLoader";
-import { Calendar, Loader2, CheckCircle2, Plus, Compass } from "lucide-react";
+import { Calendar, Loader2, CheckCircle2, Plus, Compass, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/opportunities")({ component: Opportunities });
 
@@ -68,7 +68,7 @@ function Opportunities() {
   const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-7 sm:py-10 pb-40 md:pb-10 overflow-hidden">
         <div className="mb-6 sm:mb-8">
@@ -138,21 +138,34 @@ function Opportunities() {
                       </span>
                     )}
                   </div>
-                  <button
-                    onClick={() => join(op.id)}
-                    disabled={joined}
-                    className={`inline-flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all min-h-[44px] ${joined ? "bg-success/10 text-success cursor-default" : "bg-gradient-hero text-primary-foreground hover:shadow-glow active:scale-[0.98]"}`}
-                  >
-                    {joined ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" /> Միացած ես
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" /> Միանալ
-                      </>
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => join(op.id)}
+                      disabled={joined}
+                      className={`flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all min-h-[44px] ${joined ? "bg-success/10 text-success cursor-default" : "bg-gradient-hero text-primary-foreground hover:shadow-glow active:scale-[0.98]"}`}
+                    >
+                      {joined ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" /> Միացած ես
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" /> Միանալ
+                        </>
+                      )}
+                    </button>
+                    <Link
+                      to="/agent"
+                      search={{
+                        ask: `Պատմիր ինձ «${op.title}» հնարավորության մասին և արժե՞ միանալ ինձ համար։`,
+                      }}
+                      aria-label="Հարցնել AI-ից այս հնարավորության մասին"
+                      title="Հարցնել AI-ից"
+                      className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg border border-border text-primary hover:bg-primary/5 hover:border-primary/40 transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </Link>
+                  </div>
                 </div>
               );
             })}

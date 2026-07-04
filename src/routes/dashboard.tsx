@@ -8,6 +8,7 @@ import { levelFromXP } from "@/lib/constants";
 import { fmtDayMonth, fmtTime } from "@/lib/calendar";
 import { trackGlow } from "@/lib/glow";
 import { burstConfetti } from "@/lib/confetti";
+import { useLevelUpCelebration } from "@/hooks/use-level-up";
 import { CountUp } from "@/components/CountUp";
 import {
   Sparkles,
@@ -42,9 +43,12 @@ function Dashboard() {
     generatedAt: string;
   } | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState(false);
   const [startedProjects, setStartedProjects] = useState<any[]>([]);
   const [participations, setParticipations] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
+
+  useLevelUpCelebration(user?.id, profile?.xp);
 
   useEffect(() => {
     if (loading) return;
@@ -85,6 +89,13 @@ function Dashboard() {
           model: cached.source,
           generatedAt: cached.generated_at,
         });
+        // A previous generation failed and cached an empty ("not-generated")
+        // result — the AI may be healthy now, so retry once per browser
+        // session instead of leaving the student stuck on a blank section.
+        if (cached.source !== "ai" && !sessionStorage.getItem("ai-recs-retried")) {
+          sessionStorage.setItem("ai-recs-retried", "1");
+          void generate(prof);
+        }
       } else {
         void generate(prof);
       }
@@ -94,6 +105,7 @@ function Dashboard() {
   async function generate(prof = profile) {
     if (!prof || !user) return;
     setGenerating(true);
+    setGenError(false);
     try {
       const { result, aiUsed, model, generatedAt } = await callAI("recommendations", {
         profile: prof,
@@ -122,6 +134,7 @@ function Dashboard() {
       }
     } catch (e) {
       console.error(e);
+      setGenError(true);
     } finally {
       setGenerating(false);
     }
@@ -135,7 +148,7 @@ function Dashboard() {
 
   if (loading || !profile)
     return (
-      <div className="min-h-screen grid place-items-center">
+      <div className="min-h-dvh grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -143,7 +156,7 @@ function Dashboard() {
   const lvl = levelFromXP(profile.xp || 0);
 
   return (
-    <div className="min-h-screen bg-gradient-soft overflow-x-hidden">
+    <div className="min-h-dvh bg-gradient-soft overflow-x-hidden">
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 py-5 sm:py-8 pb-40 md:pb-8 overflow-hidden">
         {/* Header — greeting + XP ring bento */}
@@ -175,39 +188,58 @@ function Dashboard() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
                   <Rocket className="w-3.5 h-3.5 text-primary" />{" "}
                   <CountUp to={startedProjects.length} eager /> նախագիծ
                 </span>
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
                   <Trophy className="w-3.5 h-3.5 text-accent" />{" "}
                   <CountUp to={achievements.length} eager /> նշան
                 </span>
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
                   <Calendar className="w-3.5 h-3.5 text-success" />{" "}
                   <CountUp to={participations.length} eager /> մասնակցություն
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-4 shrink-0">
+            <Link
+              to="/profile"
+              hash="xp-history"
+              className="flex items-center gap-4 shrink-0 rounded-2xl -m-2 p-2 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+              title="Տես XP պատմությունը"
+            >
               <XPRing pct={lvl.progressPct} level={lvl.level} />
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-primary">
+                <div className="text-xs font-semibold text-primary tabular-nums">
                   <CountUp to={profile.xp || 0} eager suffix=" XP" />
                 </div>
                 <div className="font-semibold text-sm leading-tight">{lvl.name}</div>
                 {lvl.next && (
                   <div className="text-xs text-muted-foreground mt-1">
                     Հաջորդը՝ {lvl.next.name}
-                    <span className="block">{lvl.next.min - (profile.xp || 0)} XP մնաց</span>
+                    <span className="block"><span className="tabular-nums">{lvl.next.min - (profile.xp || 0)}</span> XP մնաց</span>
                   </div>
                 )}
               </div>
-            </div>
+            </Link>
           </div>
         </div>
 
         <UpNext userId={user!.id} />
+
+        {genError && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/25 text-sm text-destructive">
+            <span>AI-ի հետ կապն ընդհատվեց, հավանաբար ծանրաբեռնվածության պատճառով։</span>
+            <button
+              onClick={() => generate()}
+              disabled={generating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/15 hover:bg-destructive/25 font-medium disabled:opacity-50 shrink-0"
+            >
+              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Կրկին փորձել
+            </button>
+          </div>
+        )}
 
         {/* AI status */}
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center sm:justify-between gap-3 mb-5 sm:mb-6 px-1 min-w-0">

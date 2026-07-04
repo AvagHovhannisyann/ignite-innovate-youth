@@ -54,7 +54,7 @@ export function Navbar() {
           <img src={logo} alt="Էջմիածնի Երիտասարդական Տուն" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0" />
           <span className="text-foreground text-sm sm:text-base hidden min-[360px]:inline min-w-0 max-w-[128px] min-[430px]:max-w-[180px] sm:max-w-none overflow-hidden text-ellipsis" style={{ whiteSpace: "nowrap" }}>
             <span className="hidden sm:inline">Էջմիածնի </span>
-            <span className="text-gradient" style={{ whiteSpace: "nowrap" }}>
+            <span className="text-primary" style={{ whiteSpace: "nowrap" }}>
               Երիտասարդական Տուն
             </span>
           </span>

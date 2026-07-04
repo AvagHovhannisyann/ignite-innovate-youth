@@ -69,6 +69,14 @@
   --input: oklch(0.94 0.012 230);
   --ring: oklch(0.68 0.14 235);
 
+  /* Motion system — one easing vocabulary for the whole product.
+     Product UI register: frequent interactions stay under 300ms. */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;   /* hover tints, toggles */
+  --dur-base: 240ms;   /* lifts, reveals of small elements */
+  --dur-slow: 420ms;   /* page-level entrances only */
+
   --gradient-hero: linear-gradient(135deg, oklch(0.68 0.14 235) 0%, oklch(0.78 0.12 230) 100%);
   --gradient-warm: linear-gradient(135deg, oklch(0.76 0.16 60) 0%, oklch(0.82 0.13 55) 100%);
   --gradient-brand: linear-gradient(135deg, oklch(0.68 0.14 235) 0%, oklch(0.76 0.16 60) 100%);
@@ -143,7 +151,8 @@
     overflow-wrap: break-word;
   }
   body {
-    min-height: 100vh;
+    /* dvh, not vh: iOS Safari's collapsing URL bar makes 100vh jump. */
+    min-height: 100dvh;
     max-width: 100vw;
     touch-action: manipulation;
     overscroll-behavior-x: none;
@@ -153,6 +162,41 @@
   }
   input, textarea, select {
     font-size: 16px;
+  }
+  /* Text selection carries the brand. */
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 24%, transparent);
+  }
+  /* Keyboard focus is always visible — accessibility floor, not an option. */
+  :where(a, button, [role="button"], input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  :where(input, textarea, select):focus-visible {
+    outline-offset: 0;
+  }
+  /* Physical press feedback on every button. Zero-specificity so any
+     component's own active transform wins over this default. */
+  @media (prefers-reduced-motion: no-preference) {
+    :where(button, [role="button"]):active {
+      transform: scale(0.98);
+    }
+  }
+  /* Fewer orphaned words in prose. */
+  p {
+    text-wrap: pretty;
+  }
+  /* Data reads better in columns: stats, XP, dates align digit-for-digit. */
+  :where(time, [data-num], .tabular-nums) {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Quiet, brand-tinted scrollbars on fine pointers. */
+  @media (hover: hover) and (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
+    }
   }
   :where(main, section, article, aside, header, footer, nav, form, fieldset, div, ul, ol, li) {
     min-width: 0;
@@ -397,10 +441,10 @@
   }
   /* Design system v2 — consistent interactive transitions */
   .transition-base {
-    transition: transform 300ms cubic-bezier(.2,.7,.2,1), box-shadow 300ms cubic-bezier(.2,.7,.2,1), border-color 200ms, background-color 200ms, color 200ms, opacity 200ms;
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease, background-color var(--dur-fast) ease, color var(--dur-fast) ease, opacity var(--dur-fast) ease;
   }
   .hover-lift {
-    transition: transform 400ms cubic-bezier(.2,.7,.2,1), box-shadow 400ms cubic-bezier(.2,.7,.2,1), border-color 300ms;
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
   }
   .hover-lift:hover {
     transform: translateY(-4px);
@@ -417,7 +461,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow-soft);
-    transition: transform 400ms cubic-bezier(.2,.7,.2,1), box-shadow 400ms cubic-bezier(.2,.7,.2,1), border-color 300ms;
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
   }
   .card-interactive:hover {
     transform: translateY(-3px);
@@ -614,7 +658,7 @@
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.animate-rise { animation: rise 700ms cubic-bezier(.2,.7,.2,1) both; }
+.animate-rise { animation: rise 520ms var(--ease-out-expo) both; }
 
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
@@ -625,12 +669,12 @@
 /* Bento tiles — interactive modules with a cursor-tracked glow (see data-glow JS). */
 .bento-tile {
   position: relative;
-  border-radius: 1.5rem;
+  border-radius: 1.25rem;
   border: 1px solid var(--border);
   background: var(--gradient-card);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
-  transition: transform 400ms cubic-bezier(.2,.7,.2,1), box-shadow 400ms cubic-bezier(.2,.7,.2,1), border-color 300ms;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
 }
 .bento-tile::before {
   content: "";
@@ -711,8 +755,22 @@
 
 /* ---------------------------------------------------------------- reveal
    Scroll-reveal for the landing page; disabled for reduced motion. */
-.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s var(--ease-out-expo), transform 0.55s var(--ease-out-expo); }
 .reveal.reveal-in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* ---------------------------------------------------------------- feed */
+/* Heart "pop" when a post is liked. */
+@keyframes like-burst {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.45); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.like-burst { animation: like-burst 0.45s ease; }
+
+/* Hide horizontal scrollbars on chip rows without killing scroll. */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

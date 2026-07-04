@@ -7,7 +7,7 @@ import {
   Send, Loader2, RotateCcw, ChevronDown, User as UserIcon, Calendar,
   CalendarPlus, CalendarX, CalendarCog, Compass, UserPlus, MessageCircleQuestion,
   Trophy, Lightbulb, Wrench, Rocket, Send as SendIcon, Ban, ListChecks, Bell,
-  MessageSquareText, Award, FileCheck,
+  MessageSquareText, Award, FileCheck, Sparkles, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
@@ -35,14 +35,27 @@ const TOOL_META: Record<string, { label: string; icon: typeof Wrench }> = {
 };
 
 const SUGGESTED_PROMPTS = [
-  "Կազմիր ինձ համար շաբաթվա պլան",
-  "Ի՞նչ նախագիծ սկսեմ իմ հետաքրքրություններով",
-  "Ցույց տուր իմ քվեսթների վիճակը",
-  "Ավելացրու ուսումնական ժամ վաղը 18:00-ին",
-  "Կա՞ ինչ-որ բան, որ բաց եմ թողել",
+  { text: "Կազմիր ինձ համար շաբաթվա պլան", icon: Calendar },
+  { text: "Ի՞նչ նախագիծ սկսեմ իմ հետաքրքրություններով", icon: Rocket },
+  { text: "Ցույց տուր իմ քվեսթների վիճակը", icon: Trophy },
+  { text: "Կա՞ ինչ-որ բան, որ բաց եմ թողել", icon: Bell },
 ];
 
-type Props = { threadId: string; initialMessages: UIMessage[]; onReset: () => void };
+const CAPABILITY_HINTS = [
+  { label: "Օրակարգ", icon: Calendar },
+  { label: "Նախագծեր", icon: Rocket },
+  { label: "Քվեստներ", icon: Trophy },
+  { label: "Ադմինի կամուրջ", icon: MessageCircleQuestion },
+];
+
+type Props = {
+  threadId: string;
+  initialMessages: UIMessage[];
+  onReset: () => void;
+  /** Prefilled question deep-linked from another page (e.g. an opportunity card). */
+  autoAsk?: string;
+  onAutoAskSent?: () => void;
+};
 
 function makeChatTransport(bearer: string | null, threadId: string) {
   if (!bearer) return undefined;
@@ -59,20 +72,20 @@ function MessageBubble({ m }: { m: UIMessage }) {
 
   if (m.role === "user") {
     return (
-      <div className="flex justify-end mb-3">
-        <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap break-words shadow-soft">
+      <div className="flex justify-end mb-4">
+        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap break-words shadow-soft">
           {text}
         </div>
       </div>
     );
   }
   return (
-    <div className="flex gap-3 mb-4">
-      <img src={logo} alt="" className="w-8 h-8 rounded-full shrink-0 mt-1" />
+    <div className="flex gap-2.5 sm:gap-3 mb-5">
+      <img src={logo} alt="" className="w-8 h-8 rounded-full shrink-0 mt-0.5 shadow-soft" />
       <div className="flex-1 min-w-0 space-y-2">
         {toolParts.map((p: any, i) => <ToolBlock key={i} part={p} />)}
         {text && (
-          <div className="text-sm text-foreground break-words">
+          <div className="rounded-2xl rounded-tl-md bg-card border border-border/70 shadow-soft px-4 py-3 text-sm text-foreground break-words">
             <MarkdownLite text={text} />
           </div>
         )}
@@ -113,10 +126,11 @@ function ToolBlock({ part }: { part: any }) {
   );
 }
 
-export function AgentChat({ threadId, initialMessages, onReset }: Props) {
+export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoAskSent }: Props) {
   const [bearer, setBearer] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setBearer(data.session?.access_token || null));
@@ -125,15 +139,37 @@ export function AgentChat({ threadId, initialMessages, onReset }: Props) {
   const transport = useMemo(() => makeChatTransport(bearer, threadId), [bearer, threadId]);
   const chatId = bearer ? threadId : `${threadId}:pending-auth`;
 
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, regenerate, clearError, status, error } = useChat({
     id: chatId,
     messages: initialMessages,
     transport: makeChatTransport(bearer, threadId),
+    onError: (err) => {
+      // Network-level failures (never reached the server) don't carry the
+      // friendlier server-side message — normalize them here too.
+      console.error("chat client error", err);
+    },
   });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status]);
+
+  // Auto-grow the composer up to ~6 lines instead of a fixed single row.
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 152)}px`;
+  }, [input]);
+
+  // Deep-linked question from another page (e.g. "Հարցնել AI-ից" on an
+  // opportunity card) — send once a transport exists, only into a fresh thread.
+  useEffect(() => {
+    if (!autoAsk || !transport || messages.length > 0) return;
+    void sendMessage({ text: autoAsk }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } });
+    onAutoAskSent?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAsk, transport]);
 
   const busy = status === "submitted" || status === "streaming";
 
@@ -144,33 +180,67 @@ export function AgentChat({ threadId, initialMessages, onReset }: Props) {
     await sendMessage({ text }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } });
   }
 
+  const friendlyError =
+    error &&
+    (error.message?.includes("An error occurred")
+      ? "Ինչ-որ բան այն չգնաց։ Փորձիր կրկին։"
+      : error.message || "Ինչ-որ բան այն չգնաց։");
+
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] max-w-3xl mx-auto w-full">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <div className="text-xs text-muted-foreground">Քո անձնական AI օգնականը։ Կարող է մուտք գործել քո պրոֆիլ, օրակարգ, քվեսթներ։</div>
-        <button onClick={onReset} className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground" title="Մաքրել զրույցը">
-          <RotateCcw className="w-3.5 h-3.5" /> Նոր
+      {/* Branded header */}
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-border">
+        <div className="relative shrink-0">
+          <img src={logo} alt="" className="w-10 h-10 rounded-full shadow-soft" />
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-success border-2 border-background" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-sm font-semibold leading-tight">EYH Mentor</div>
+          <div className="text-[11px] text-muted-foreground truncate">Քո անձնական AI մենթորը · միշտ առցանց</div>
+        </div>
+        <button
+          onClick={onReset}
+          className="shrink-0 inline-flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-2.5 rounded-lg hover:bg-secondary text-muted-foreground text-xs font-medium transition-colors"
+          title="Մաքրել զրույցը"
+        >
+          <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden min-[420px]:inline">Նոր</span>
         </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4">
         {messages.length === 0 && (
-          <div className="text-center mt-10 sm:mt-14">
-            <img src={logo} alt="" className="w-14 h-14 object-contain mx-auto mb-3 animate-float" />
-            <div className="font-display text-lg mb-1">Բարև։ Ի՞նչ կօգնեմ այսօր։</div>
-            <p className="text-xs text-muted-foreground mb-5">
-              Ես գիտեմ քո պրոֆիլը, օրակարգը և քվեսթները — հարցրու ինչ ուզում ես։
+          <div className="text-center mt-6 sm:mt-10 animate-rise">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl scale-150" />
+              <img src={logo} alt="" className="relative w-16 h-16 object-contain mx-auto animate-float" />
+            </div>
+            <div className="font-display text-xl mb-1.5">Բարև։ Ի՞նչ կօգնեմ այսօր։</div>
+            <p className="text-xs text-muted-foreground mb-5 max-w-xs mx-auto">
+              Ես ճանաչում եմ քո պրոֆիլը, օրակարգը և քվեսթները, և կարող եմ իրականում գործել՝ ոչ միայն խորհուրդ տալ։
             </p>
-            <div className="flex flex-wrap justify-center gap-2 max-w-md mx-auto">
+
+            <div className="flex flex-wrap justify-center gap-1.5 mb-6">
+              {CAPABILITY_HINTS.map((c) => (
+                <span
+                  key={c.label}
+                  className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-secondary/70 text-muted-foreground"
+                >
+                  <c.icon className="w-3 h-3" /> {c.label}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-2 max-w-sm mx-auto">
               {SUGGESTED_PROMPTS.map((p) => (
                 <button
-                  key={p}
+                  key={p.text}
                   type="button"
                   disabled={!transport}
-                  onClick={() => sendMessage({ text: p }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } })}
-                  className="text-xs px-3 py-2 rounded-full border border-border bg-card/70 hover:border-primary/40 hover:bg-primary/5 transition-colors text-left"
+                  onClick={() => sendMessage({ text: p.text }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } })}
+                  className="flex items-center gap-2.5 text-sm px-3.5 py-2.5 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-primary/5 transition-colors text-left disabled:opacity-50"
                 >
-                  {p}
+                  <p.icon className="w-4 h-4 text-primary shrink-0" />
+                  <span className="min-w-0">{p.text}</span>
                 </button>
               ))}
             </div>
@@ -178,30 +248,54 @@ export function AgentChat({ threadId, initialMessages, onReset }: Props) {
         )}
         {messages.map((m) => <MessageBubble key={m.id} m={m} />)}
         {status === "submitted" && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Մտածում է…</div>
+          <div className="flex gap-2.5 sm:gap-3 mb-5">
+            <img src={logo} alt="" className="w-8 h-8 rounded-full shrink-0 mt-0.5 shadow-soft opacity-70" />
+            <div className="rounded-2xl rounded-tl-md bg-card border border-border/70 px-4 py-3 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.3s]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.15s]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" />
+            </div>
+          </div>
         )}
-        {error && <div className="text-sm text-destructive">Սխալ. {error.message}</div>}
+        {friendlyError && (
+          <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/25 px-3.5 py-3 text-sm text-destructive mb-3">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <div className="break-words">{friendlyError}</div>
+              <button
+                onClick={() => {
+                  clearError();
+                  void regenerate();
+                }}
+                className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold hover:underline"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Կրկին փորձել
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <form
         onSubmit={(e) => { e.preventDefault(); submit(); }}
-        className="border-t border-border p-3 flex gap-2 items-end bg-background"
+        className="border-t border-border p-2.5 sm:p-3 flex gap-2 items-end bg-background"
       >
         <textarea
+          ref={areaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
           }}
           rows={1}
-          placeholder="Գրիր հաղորդագրություն… (Enter ուղարկելու, Shift+Enter նոր տողի)"
-          className="flex-1 resize-none rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-40"
+          placeholder="Գրիր հաղորդագրություն… (Enter՝ ուղարկելու, Shift+Enter՝ նոր տողի)"
+          className="flex-1 resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-[152px]"
           disabled={busy}
         />
         <button
           type="submit"
           disabled={busy || !input.trim()}
-          className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90"
+          className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-hero text-primary-foreground disabled:opacity-40 hover:opacity-90 transition-opacity shadow-soft"
           aria-label="Ուղարկել"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

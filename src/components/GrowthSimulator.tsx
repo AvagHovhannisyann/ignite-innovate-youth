@@ -91,7 +91,7 @@ export function GrowthSimulator() {
             })}
           </div>
           <div className="mt-5 flex items-baseline gap-2">
-            <span className="font-display text-4xl text-gradient leading-none">{weeklyXP}</span>
+            <span className="font-display text-4xl text-primary tabular-nums leading-none">{weeklyXP}</span>
             <span className="text-sm text-muted-foreground">XP / շաբաթ</span>
           </div>
         </div>
