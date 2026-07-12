@@ -111,14 +111,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             key={n.to}
             to={n.to}
             data-tour={`nav-${n.to.slice(1)}`}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive(n.to)
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             } ${collapsed && !inDrawer ? "justify-center" : ""}`}
             title={collapsed ? n.label : undefined}
           >
-            <n.icon className="w-5 h-5 shrink-0" />
+            {isActive(n.to) && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary" aria-hidden />
+            )}
+            <n.icon className="w-5 h-5 shrink-0" strokeWidth={isActive(n.to) ? 2.4 : 2} />
             {(!collapsed || inDrawer) && <span className="truncate">{n.label}</span>}
           </Link>
         ))}
@@ -145,7 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarBody />
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-background border border-border grid place-items-center shadow-sm hover:bg-secondary"
+          className="absolute -right-3.5 top-20 w-7 h-7 rounded-full bg-background border border-border grid place-items-center shadow-sm hover:bg-secondary hover:border-primary/30 transition-colors"
           aria-label={collapsed ? "Բացել" : "Փակել"}
         >
           {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
@@ -163,7 +166,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className={`flex flex-col min-w-0 transition-[padding] duration-200 ${collapsed ? "md:pl-[72px]" : "md:pl-64"}`}>
-        <header className="sticky top-0 z-30 h-14 sm:h-16 bg-background/85 backdrop-blur-md border-b border-border flex items-center gap-2 px-3 sm:px-6">
+        <header className="sticky top-0 z-30 h-14 sm:h-16 bg-background/85 backdrop-blur-md border-b border-border/60 flex items-center gap-2 px-3 sm:px-6">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
