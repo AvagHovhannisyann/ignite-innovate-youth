@@ -58,7 +58,7 @@ export function MobileTabBar() {
       style={{ paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}
     >
       <div className="mobile-tab-shell mx-auto w-full max-w-[calc(100vw-24px)] px-0 pb-1 pointer-events-auto">
-        <ul className="relative grid grid-cols-5 items-end gap-0 rounded-[28px] bg-background/92 backdrop-blur-2xl border border-border/60 shadow-[0_16px_44px_-14px_rgba(0,0,0,0.32)] px-1.5 py-2 overflow-visible">
+        <ul className="relative grid grid-cols-5 items-end gap-0 rounded-3xl bg-background/92 backdrop-blur-2xl border border-border/60 shadow-[0_16px_44px_-14px_rgba(0,0,0,0.32)] px-1.5 py-2 overflow-visible">
           {TABS.map(({ to, label, icon: Icon, primary, action }) => {
             const active = isActive(to);
 

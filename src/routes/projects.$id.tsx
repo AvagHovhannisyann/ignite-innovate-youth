@@ -474,7 +474,7 @@ function ProjectDetail() {
                 <span>AI-ի հետ կապն ընդհատվեց, հավանաբար ծանրաբեռնվածության պատճառով։</span>
                 <button
                   onClick={() => profile && void loadDetail(idea, profile)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-card border border-border hover:bg-secondary text-sm font-medium"
+                  className="btn btn-secondary"
                 >
                   Կրկին փորձել
                 </button>

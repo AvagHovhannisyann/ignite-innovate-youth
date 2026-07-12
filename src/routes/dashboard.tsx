@@ -272,7 +272,7 @@ function Dashboard() {
           <button
             onClick={() => profile && void generate(profile)}
             disabled={generating}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-card border border-border hover:bg-secondary text-sm font-medium disabled:opacity-50 w-full sm:w-auto min-w-0"
+            className="btn btn-secondary w-full sm:w-auto min-w-0"
           >
             {generating ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -736,7 +736,7 @@ function ProjectIdeaCard({ project, onOpen }: { project: ProjectIdea; onOpen: ()
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 min-w-0">
           <button
             onClick={() => setOpen((v) => !v)}
-            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-sm font-medium min-h-[44px] min-w-0"
+            className="btn btn-secondary w-full min-w-0"
           >
             {open ? "Թաքցնել մանրամասները" : "Տեսնել մանրամասները"}
           </button>
