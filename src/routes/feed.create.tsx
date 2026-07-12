@@ -351,7 +351,7 @@ function CreatePostPage() {
             <button
               type="submit"
               disabled={submitting || uploading}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+              className="btn btn-primary"
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
