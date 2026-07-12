@@ -309,7 +309,7 @@ function Dashboard() {
                       key={p.id}
                       to="/projects/$id"
                       params={{ id: p.id }}
-                      className="grid grid-cols-1 min-[460px]:grid-cols-[minmax(0,1fr)_auto] min-[460px]:items-center gap-3 bg-card border border-border rounded-xl p-3 hover:border-primary/50 transition-colors min-w-0 overflow-hidden text-left"
+                      className="card-base grid grid-cols-1 min-[460px]:grid-cols-[minmax(0,1fr)_auto] min-[460px]:items-center gap-3 p-3 hover:border-primary/50 transition-colors min-w-0 overflow-hidden text-left"
                     >
                       <div className="min-w-0">
                         <div className="font-medium break-words">{p.title}</div>
@@ -365,10 +365,7 @@ function Dashboard() {
             <Card title="Աճի առաջարկներ" icon={Zap} delay={120}>
               <div className="space-y-2">
                 {(recs?.growthSuggestions || []).map((g, i) => (
-                  <div
-                    key={i}
-                    className="bg-card border border-border rounded-xl p-3 min-w-0 overflow-hidden"
-                  >
+                  <div key={i} className="card-base p-3 min-w-0 overflow-hidden">
                     <div className="font-medium text-sm break-words">{g.title}</div>
                     <div className="text-xs text-muted-foreground mt-1 break-words">
                       {g.description}
@@ -532,7 +529,7 @@ function List({ items }: { items: { title: string; sub?: string; badge?: string 
       {items.map((it, i) => (
         <div
           key={i}
-          className="grid grid-cols-1 min-[460px]:grid-cols-[minmax(0,1fr)_auto] min-[460px]:items-start gap-2 min-[460px]:gap-3 bg-card border border-border rounded-xl p-3 min-w-0 overflow-hidden"
+          className="card-base grid grid-cols-1 min-[460px]:grid-cols-[minmax(0,1fr)_auto] min-[460px]:items-start gap-2 min-[460px]:gap-3 p-3 min-w-0 overflow-hidden"
         >
           <div className="min-w-0">
             <div className="font-medium text-sm break-words">{it.title}</div>
@@ -569,7 +566,7 @@ function ProjectIdeaCard({ project, onOpen }: { project: ProjectIdea; onOpen: ()
   const topics: string[] = project?.resources?.learningTopics || [];
   const skills: string[] = project.skillsLearned || [];
   return (
-    <div className="bg-card border border-border rounded-2xl hover:border-primary/50 hover:shadow-soft transition-all min-w-0 max-w-full">
+    <div className="card-base hover:border-primary/50 transition-colors min-w-0 max-w-full">
       <div className="p-3 min-[380px]:p-4 sm:p-5 min-w-0">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 mb-2 min-w-0">
           <h4 className="font-semibold text-base sm:text-lg min-w-0 break-words">
@@ -734,10 +731,7 @@ function ProjectIdeaCard({ project, onOpen }: { project: ProjectIdea; onOpen: ()
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 min-w-0">
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="btn btn-secondary w-full min-w-0"
-          >
+          <button onClick={() => setOpen((v) => !v)} className="btn btn-secondary w-full min-w-0">
             {open ? "Թաքցնել մանրամասները" : "Տեսնել մանրամասները"}
           </button>
           <button

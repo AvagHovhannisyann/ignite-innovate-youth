@@ -781,6 +781,17 @@ async function auditRoute(context, scenario, profileConfig, findings) {
     ) {
       return;
     }
+    // Remotion's <Player> creates a SharedAudioContext on mount as an
+    // autoplay-unlock trick — it preloads a silent MP3 and logs this via
+    // console.error on every browser, for every Player, whether or not the
+    // composition uses audio at all. Confirmed upstream Remotion behavior
+    // (node_modules/remotion/dist/cjs/audio/shared-audio-tags.js), not an
+    // app defect. Because routing here is client-side (no full reload
+    // between routes), it also re-fires on every subsequent route audited
+    // in the same page/tab after the first Player mount.
+    if (msg.text().startsWith("Loading media from  'data:audio/mp3;base64,")) {
+      return;
+    }
     errors.push(msg.text());
   });
   page.on("pageerror", (err) => errors.push(`PAGEERROR: ${err.message}`));

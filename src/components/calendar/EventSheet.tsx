@@ -13,8 +13,7 @@ import type { EventDraft } from "@/hooks/useSchedule";
 import { Trash2, Bell, MapPin, Loader2 } from "lucide-react";
 
 export type SheetTarget =
-  | { mode: "create"; start: Date; end: Date; allDay?: boolean }
-  | { mode: "edit"; event: CalEvent };
+  { mode: "create"; start: Date; end: Date; allDay?: boolean } | { mode: "edit"; event: CalEvent };
 
 const REMINDERS: { v: number | null; label: string }[] = [
   { v: null, label: "Առանց" },

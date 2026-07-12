@@ -285,7 +285,7 @@ function ProfilePage() {
                 </span>
                 <Link
                   to="/support"
-                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-card border border-border hover:bg-secondary transition-base min-h-[36px]"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-full bg-card border border-border hover:bg-secondary transition-base min-h-11"
                 >
                   <LifeBuoy className="w-3.5 h-3.5" /> Աջակցություն
                 </Link>
@@ -528,7 +528,7 @@ function ProfilePage() {
                     type="button"
                     onClick={addCustomSkill}
                     disabled={!customSkill.trim()}
-                    className="shrink-0 min-h-[44px] px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                    className="btn btn-primary shrink-0"
                   >
                     Ավելացնել
                   </button>
@@ -557,11 +557,7 @@ function ProfilePage() {
                   "Փոփոխությունները պահպանվում են միայն քո հաշվում։"
                 )}
               </div>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 shadow-soft min-h-[44px]"
-              >
+              <button onClick={save} disabled={saving} className="btn btn-primary">
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -720,10 +716,7 @@ function ProfilePage() {
             </Section>
 
             <Section title="Իմ գրառումները" icon={MessageSquare}>
-              <Link
-                to="/feed/create"
-                className="mb-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 min-h-[44px]"
-              >
+              <Link to="/feed/create" className="btn btn-primary w-full mb-3">
                 <Plus className="w-4 h-4" /> Նոր գրառում
               </Link>
               {myPosts === null ? (

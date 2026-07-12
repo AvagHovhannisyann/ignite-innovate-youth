@@ -333,7 +333,7 @@ function SchedulePage() {
             )}
             <button
               onClick={() => openCreate(new Date(new Date().setMinutes(0, 0, 0)))}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               <Plus className="w-4 h-4" />{" "}
               <span className="hidden min-[420px]:inline">Ավելացնել</span>

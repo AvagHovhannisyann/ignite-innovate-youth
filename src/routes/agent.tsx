@@ -53,13 +53,11 @@ function AgentPage() {
         if (cancelled) return;
         setThreadId(tid);
         setInitialMessages(
-          (msgs || []).map(
-            (message): UIMessage => ({
-              id: message.ai_message_id || message.id,
-              role: message.role === "assistant" ? "assistant" : "user",
-              parts: Array.isArray(message.parts) ? (message.parts as UIMessage["parts"]) : [],
-            }),
-          ),
+          (msgs || []).map((message): UIMessage => ({
+            id: message.ai_message_id || message.id,
+            role: message.role === "assistant" ? "assistant" : "user",
+            parts: Array.isArray(message.parts) ? (message.parts as UIMessage["parts"]) : [],
+          })),
         );
         setReady(true);
       } catch (error: unknown) {

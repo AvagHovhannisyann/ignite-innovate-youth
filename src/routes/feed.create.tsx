@@ -348,11 +348,7 @@ function CreatePostPage() {
             <p className="text-xs text-muted-foreground break-words min-w-0">
               Կարգավիճակ՝ Սպասում է վերանայման
             </p>
-            <button
-              type="submit"
-              disabled={submitting || uploading}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 min-h-[44px]"
-            >
+            <button type="submit" disabled={submitting || uploading} className="btn btn-primary">
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (

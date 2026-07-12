@@ -45,7 +45,7 @@ export function SubscribeMenu({ httpsUrl }: { httpsUrl: string }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-secondary px-3 text-sm hover:bg-secondary/70">
+        <button className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-secondary px-3 text-sm hover:bg-secondary/70">
           <CalendarCheck className="w-4 h-4" />
           <span className="hidden sm:inline">Բաժանորդագրվել</span>
         </button>

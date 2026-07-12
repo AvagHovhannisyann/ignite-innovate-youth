@@ -252,7 +252,7 @@ function Feed() {
                 setPrefill(dailyPrompt());
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 min-h-[40px] rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
+              className="btn btn-primary w-full"
             >
               <MessageCircleHeart className="w-4 h-4" /> Պատասխանել
             </button>
