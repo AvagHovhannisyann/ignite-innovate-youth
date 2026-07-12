@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { PageLoader, EmptyState } from "@/components/PageLoader";
-import { callAI } from "@/lib/ai";
+import { callAI, type AdminInsightsResult } from "@/lib/ai";
 import { fetchPendingPosts, moderatePost, type Post } from "@/lib/feed";
 import {
   reviewProject,
@@ -12,6 +12,7 @@ import {
   STATUS_LABEL,
   TIER_LABEL,
   type DifficultyTier,
+  type ProjectStatus,
 } from "@/lib/projects";
 import { fetchAllThreads, setThreadStatus, type SupportThread } from "@/lib/support";
 import { ProjectChat } from "@/components/ProjectChat";
@@ -40,6 +41,7 @@ import {
   Award,
   Star,
   LifeBuoy,
+  type LucideIcon,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -57,6 +59,16 @@ import {
   Legend,
 } from "recharts";
 import { format, startOfWeek, subWeeks } from "date-fns";
+import { hy } from "date-fns/locale";
+import type { Tables } from "@/integrations/supabase/types";
+import { getErrorMessage } from "@/lib/utils";
+import { toast } from "sonner";
+
+type ParticipationWithOpportunity = Tables<"participations"> & {
+  opportunities: Pick<Tables<"opportunities">, "category" | "title"> | null;
+};
+
+type AIResultMeta = { aiUsed: boolean; model: string; generatedAt: string };
 
 export const Route = createFileRoute("/admin")({ component: Admin });
 
@@ -73,17 +85,17 @@ function Admin() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [students, setStudents] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [parts, setParts] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
-  const [insights, setInsights] = useState<any>(null);
-  const [insightsMeta, setInsightsMeta] = useState<any>(null);
+  const [students, setStudents] = useState<Tables<"profiles">[]>([]);
+  const [projects, setProjects] = useState<Tables<"started_projects">[]>([]);
+  const [parts, setParts] = useState<ParticipationWithOpportunity[]>([]);
+  const [achievements, setAchievements] = useState<Tables<"achievements">[]>([]);
+  const [insights, setInsights] = useState<AdminInsightsResult | null>(null);
+  const [insightsMeta, setInsightsMeta] = useState<AIResultMeta | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<Post[] | null>(null);
-  const [pendingProjects, setPendingProjects] = useState<any[] | null>(null);
+  const [pendingProjects, setPendingProjects] = useState<Tables<"started_projects">[] | null>(null);
   const [threads, setThreads] = useState<SupportThread[] | null>(null);
   const [activeThread, setActiveThread] = useState<SupportThread | null>(null);
 
@@ -174,7 +186,7 @@ function Admin() {
       const wStart = startOfWeek(subWeeks(new Date(), i));
       const wEnd = startOfWeek(subWeeks(new Date(), i - 1));
       weeks.push({
-        label: format(wStart, "MMM d"),
+        label: format(wStart, "d MMM", { locale: hy }),
         signups: students.filter((s) => {
           const d = new Date(s.created_at);
           return d >= wStart && d < wEnd;
@@ -246,10 +258,10 @@ function Admin() {
         <Navbar />
         <div className="max-w-md mx-auto px-4 py-20 text-center card-base p-8 mt-10">
           <ShieldAlert className="w-10 h-10 text-primary mx-auto mb-3" />
-          <h2 className="font-display text-xl font-bold">Admin access required</h2>
+          <h2 className="font-display text-xl font-bold">Ադմինի հասանելիություն է պահանջվում</h2>
           <p className="text-sm text-muted-foreground mt-2">
-            Your account does not have the admin role. Ask a project owner to add the{" "}
-            <code className="px-1 py-0.5 rounded bg-secondary">admin</code> role to your user.
+            Քո հաշիվը չունի ադմինի դեր։ Դիմիր հարթակի պատասխանատուին՝ հասանելիություն ստանալու
+            համար։
           </p>
         </div>
       </div>
@@ -263,20 +275,20 @@ function Admin() {
         <header className="mb-8 animate-rise min-w-0">
           <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-primary font-semibold mb-2 max-w-full">
             <BarChart3 className="w-3.5 h-3.5 shrink-0" />{" "}
-            <span className="break-words">Admin</span>
+            <span className="break-words">Ադմինիստրացիա</span>
           </div>
           <h1 className="font-display text-2xl min-[380px]:text-3xl md:text-4xl font-bold break-words leading-tight">
-            Operations & analytics
+            Կառավարում և վերլուծություն
           </h1>
           <p className="text-muted-foreground mt-2 max-w-xl break-words">
-            A real-time view of student interests, projects, engagement, and weekly trends.
+            Ուսանողների հետաքրքրությունների, նախագծերի և ակտիվության թարմ պատկերը։
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/admin/quest-reviews"
               className="inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20"
             >
-              🎯 Քվեստների ստուգում
+              <Check className="w-4 h-4" /> Քվեստների ստուգում
             </Link>
           </div>
         </header>
@@ -291,31 +303,31 @@ function Admin() {
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
             <KPI
               icon={Users}
-              label="Total students"
+              label="Ընդհանուր ուսանողներ"
               value={stats.totalStudents}
-              hint={`${stats.onboarded} onboarded`}
+              hint={`${stats.onboarded} ավարտել են մուտքագրումը`}
             />
             <KPI
               icon={Activity}
-              label="Engagement"
+              label="Ներգրավվածություն"
               value={`${stats.engagementRate}%`}
-              hint={`${stats.activeStudents} active`}
+              hint={`${stats.activeStudents} ակտիվ ուսանող`}
             />
-            <KPI icon={Rocket} label="Projects started" value={stats.projectCount} />
-            <KPI icon={Trophy} label="Badges earned" value={stats.achievementCount} />
+            <KPI icon={Rocket} label="Մեկնարկած նախագծեր" value={stats.projectCount} />
+            <KPI icon={Trophy} label="Ստացած նշաններ" value={stats.achievementCount} />
           </div>
         )}
 
         <div className="grid lg:grid-cols-3 gap-5 sm:gap-6">
           <div className="lg:col-span-2 space-y-6">
             <Section
-              title="Weekly activity"
+              title="Շաբաթական ակտիվություն"
               icon={TrendingUp}
-              subtitle="Signups, projects, and participations over the last 8 weeks"
+              subtitle="Գրանցումներ, նախագծեր և մասնակցություններ՝ վերջին 8 շաբաթում"
             >
               {stats.weeks.every((w) => w.signups + w.projects + w.participations === 0) ? (
                 <p className="text-sm text-muted-foreground">
-                  Not enough activity yet to draw a trend.
+                  Դեռ բավարար ակտիվություն չկա միտումը ցույց տալու համար։
                 </p>
               ) : (
                 <div className="h-64">
@@ -378,9 +390,11 @@ function Admin() {
             </Section>
 
             <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
-              <Section title="Top interests" icon={TrendingUp}>
+              <Section title="Առաջատար հետաքրքրություններ" icon={TrendingUp}>
                 {stats.sortedInterests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No interest data yet.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Հետաքրքրությունների տվյալներ դեռ չկան։
+                  </p>
                 ) : (
                   <div className="h-64">
                     <ResponsiveContainer>
@@ -424,9 +438,9 @@ function Admin() {
                 )}
               </Section>
 
-              <Section title="Category demand" icon={Rocket}>
+              <Section title="Պահանջված ուղղություններ" icon={Rocket}>
                 {stats.sortedCategories.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No participations yet.</p>
+                  <p className="text-sm text-muted-foreground">Մասնակցություններ դեռ չկան։</p>
                 ) : (
                   <div className="h-64">
                     <ResponsiveContainer>
@@ -560,7 +574,7 @@ function Admin() {
                             <div className="font-medium truncate">{t.subject}</div>
                             <div className="text-[11px] text-muted-foreground truncate">
                               {t.user?.full_name || t.user?.email || t.user_id.slice(0, 8)} ·{" "}
-                              {new Date(t.last_message_at).toLocaleString()}
+                              {new Date(t.last_message_at).toLocaleString("hy-AM")}
                             </div>
                           </div>
                           <span
@@ -586,12 +600,12 @@ function Admin() {
               )}
             </Section>
 
-            <Section title="Recently started projects" icon={Sparkles}>
+            <Section title="Վերջերս մեկնարկած նախագծեր" icon={Sparkles}>
               {projects.length === 0 ? (
                 <EmptyState
                   icon={Rocket}
-                  title="No projects yet"
-                  description="Once a student starts a project, it'll appear here."
+                  title="Նախագծեր դեռ չկան"
+                  description="Ուսանողի մեկնարկած առաջին նախագիծը կհայտնվի այստեղ։"
                 />
               ) : (
                 <div className="space-y-2">
@@ -619,7 +633,7 @@ function Admin() {
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 mb-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <Lightbulb className="w-4 h-4 text-primary shrink-0" />
-                  <h3 className="font-semibold break-words min-w-0">AI Insights</h3>
+                  <h3 className="font-semibold break-words min-w-0">AI վերլուծություն</h3>
                 </div>
                 <button
                   onClick={generateInsights}
@@ -631,7 +645,7 @@ function Admin() {
                   ) : (
                     <RefreshCw className="w-3 h-3" />
                   )}{" "}
-                  Generate
+                  Ստեղծել
                 </button>
               </div>
               {insightsMeta && (
@@ -646,7 +660,7 @@ function Admin() {
               )}
               {insightsError && (
                 <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/25 text-xs text-destructive">
-                  <span>Չհաջողվեց գեներացնել insight-ները։</span>
+                  <span>Չհաջողվեց ստեղծել վերլուծությունը։</span>
                   <button onClick={generateInsights} className="underline font-medium shrink-0">
                     Կրկին փորձել
                   </button>
@@ -654,35 +668,39 @@ function Admin() {
               )}
               {!insights ? (
                 <p className="text-sm text-muted-foreground">
-                  Generate insights to see AI-powered recommendations for next programs.
+                  Ստեղծիր վերլուծություն՝ հաջորդ ծրագրերի AI առաջարկները տեսնելու համար։
                 </p>
               ) : (
                 <div className="space-y-4 text-sm">
                   {insights.summary ? (
                     <p className="text-foreground break-words">{insights.summary}</p>
                   ) : (
-                    <p className="text-muted-foreground">AI insight-ներ դեռ չեն գեներացվել։</p>
+                    <p className="text-muted-foreground">AI վերլուծություն դեռ չի ստեղծվել։</p>
                   )}
-                  <InsightList title="Key insights" items={insights.keyInsights} />
-                  <InsightList title="Recommended programs" items={insights.recommendedPrograms} />
+                  <InsightList title="Հիմնական դիտարկումներ" items={insights.keyInsights} />
+                  <InsightList title="Առաջարկվող ծրագրեր" items={insights.recommendedPrograms} />
                   <InsightList
-                    title="Project directions"
+                    title="Նախագծային ուղղություններ"
                     items={insights.recommendedProjectDirections}
                   />
                   <InsightList
-                    title="Next actions"
+                    title="Հաջորդ քայլեր"
                     items={insights.nextActions}
                     icon={ArrowRight}
                   />
-                  <InsightList title="Engagement risks" items={insights.engagementRisks} muted />
+                  <InsightList
+                    title="Ներգրավվածության ռիսկեր"
+                    items={insights.engagementRisks}
+                    muted
+                  />
                 </div>
               )}
             </section>
 
-            <Section title="Top schools" icon={GraduationCap}>
+            <Section title="Առաջատար դպրոցներ" icon={GraduationCap}>
               {stats.sortedSchools.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Schools will appear as students complete onboarding.
+                  Դպրոցները կհայտնվեն, երբ ուսանողները լրացնեն իրենց պրոֆիլները։
                 </p>
               ) : (
                 <ul className="space-y-2 text-sm">
@@ -701,12 +719,12 @@ function Admin() {
               )}
             </Section>
 
-            <Section title="Most active students" icon={Users}>
+            <Section title="Ամենաակտիվ ուսանողներ" icon={Users}>
               {students.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No students yet.</p>
+                <p className="text-sm text-muted-foreground">Ուսանողներ դեռ չկան։</p>
               ) : (
                 <ul className="space-y-2 text-sm">
-                  {students
+                  {[...students]
                     .sort((a, b) => (b.xp || 0) - (a.xp || 0))
                     .slice(0, 6)
                     .map((s) => (
@@ -730,7 +748,17 @@ function Admin() {
   );
 }
 
-function KPI({ icon: Icon, label, value, hint }: any) {
+function KPI({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: ReactNode;
+  hint?: string;
+}) {
   return (
     <div className="bg-gradient-card border border-border rounded-2xl p-4 shadow-soft transition-base hover:shadow-elegant overflow-hidden min-w-0">
       <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
@@ -745,7 +773,17 @@ function KPI({ icon: Icon, label, value, hint }: any) {
   );
 }
 
-function Section({ title, subtitle, icon: Icon, children }: any) {
+function Section({
+  title,
+  subtitle,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
   return (
     <section className="card-base p-4 sm:p-5 overflow-hidden min-w-0">
       <div className="flex items-start justify-between gap-3 mb-4 min-w-0">
@@ -773,7 +811,7 @@ function InsightList({
   title: string;
   items?: string[];
   muted?: boolean;
-  icon?: any;
+  icon?: LucideIcon;
 }) {
   if (!items?.length) return null;
   return (
@@ -809,23 +847,23 @@ function ModerationItem({ post, onDone }: { post: Post; onDone: () => void }) {
     try {
       await moderatePost(post.id, true);
       onDone();
-    } catch (e: any) {
-      alert(e.message || "Error");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց հաստատել հրապարակումը"));
     } finally {
       setBusy(null);
     }
   }
   async function reject() {
     if (!reason.trim()) {
-      alert("Մուտքագրիր մերժման պատճառը");
+      toast.error("Մուտքագրիր մերժման պատճառը");
       return;
     }
     setBusy("reject");
     try {
       await moderatePost(post.id, false, reason.trim());
       onDone();
-    } catch (e: any) {
-      alert(e.message || "Error");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց մերժել հրապարակումը"));
     } finally {
       setBusy(null);
     }
@@ -835,7 +873,7 @@ function ModerationItem({ post, onDone }: { post: Post; onDone: () => void }) {
     <div className="bg-secondary/40 border border-border rounded-xl p-3 sm:p-4 min-w-0">
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2 flex-wrap min-w-0">
         <span className="font-medium text-foreground break-words">
-          {post.author?.full_name || post.author?.email || "Օգտատեր"}
+          {post.author?.full_name || "Օգտատեր"}
         </span>
         <span className="inline-flex items-center gap-1">
           <Clock className="w-3 h-3" />
@@ -862,9 +900,19 @@ function ModerationItem({ post, onDone }: { post: Post; onDone: () => void }) {
           {post.signed_media!.map((m, i) => (
             <div key={i} className="aspect-square bg-background rounded-lg overflow-hidden">
               {m.type === "video" ? (
-                <video src={m.url} controls playsInline className="w-full h-full object-cover" />
+                <video
+                  src={m.url}
+                  controls
+                  playsInline
+                  aria-label={`Գրառման կցված տեսանյութ ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <img src={m.url} alt="" className="w-full h-full object-cover" />
+                <img
+                  src={m.url}
+                  alt={`Գրառման կցված նկար ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
               )}
             </div>
           ))}
@@ -892,6 +940,8 @@ function ModerationItem({ post, onDone }: { post: Post; onDone: () => void }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
+            maxLength={1000}
+            aria-label="Գրառման մերժման պատճառ"
             className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm"
           />
         </div>
@@ -952,7 +1002,7 @@ function ProjectReviewItem({
   adminId,
   onDone,
 }: {
-  project: any;
+  project: Tables<"started_projects">;
   adminId: string;
   onDone: () => void;
 }) {
@@ -969,23 +1019,23 @@ function ProjectReviewItem({
     try {
       await reviewProject(project.id, { approve: true, exceptional, rating });
       onDone();
-    } catch (e: any) {
-      alert(e.message || "Error");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց հաստատել նախագիծը"));
     } finally {
       setBusy(null);
     }
   }
   async function reject() {
     if (!reason.trim()) {
-      alert("Մուտքագրիր մերժման պատճառը");
+      toast.error("Մուտքագրիր մերժման պատճառը");
       return;
     }
     setBusy("reject");
     try {
       await reviewProject(project.id, { approve: false, reason });
       onDone();
-    } catch (e: any) {
-      alert(e.message || "Error");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց մերժել նախագիծը"));
     } finally {
       setBusy(null);
     }
@@ -998,7 +1048,7 @@ function ProjectReviewItem({
           {TIER_LABEL[tier]}
         </span>
         <span className="px-2 py-0.5 rounded-full bg-card border border-border">
-          {STATUS_LABEL[project.status as keyof typeof STATUS_LABEL] || project.status}
+          {STATUS_LABEL[project.status as ProjectStatus] || project.status}
         </span>
         {project.submitted_at && (
           <span className="text-muted-foreground inline-flex items-center gap-1">
@@ -1042,6 +1092,7 @@ function ProjectReviewItem({
           <select
             value={rating}
             onChange={(e) => setRating(Number(e.target.value))}
+            aria-label="Նախագծի գնահատական"
             className="ml-auto bg-background border border-input rounded px-2 py-1 text-sm"
           >
             {[1, 2, 3, 4, 5].map((n) => (
@@ -1062,6 +1113,8 @@ function ProjectReviewItem({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
+            maxLength={1000}
+            aria-label="Նախագծի մերժման պատճառ"
             className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm"
           />
         </div>

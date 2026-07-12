@@ -1,19 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { EmptyState } from "@/components/PageLoader";
 import { Calendar, Loader2, CheckCircle2, Plus, Compass, Sparkles } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/opportunities")({ component: Opportunities });
 
 function Opportunities() {
   const { user } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<Tables<"opportunities">[]>([]);
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const opportunityGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -30,37 +35,49 @@ function Opportunities() {
     })();
   }, [user]);
 
+  useEffect(() => {
+    const grid = opportunityGridRef.current;
+    if (!user || !grid || !items.length || typeof IntersectionObserver === "undefined") return;
+
+    const recorded = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.5) continue;
+          const element = entry.target as HTMLElement;
+          const opportunityId = element.dataset.opportunityId;
+          if (!opportunityId || recorded.has(opportunityId)) continue;
+          recorded.add(opportunityId);
+          observer.unobserve(element);
+          void supabase.rpc("record_opportunity_view", { _opportunity_id: opportunityId });
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    const cards = grid.querySelectorAll<HTMLElement>("[data-opportunity-id]");
+    cards.forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [items, user]);
+
   async function join(id: string) {
     if (!user) {
       window.location.href = "/auth";
       return;
     }
-    const { error } = await supabase
-      .from("participations")
-      .insert({ user_id: user.id, opportunity_id: id });
-    if (!error) {
-      setJoinedIds(new Set([...joinedIds, id]));
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("xp")
-        .eq("id", user.id)
-        .single();
-      const newXp = (prof?.xp || 0) + 25;
-      await supabase.from("profiles").update({ xp: newXp }).eq("id", user.id);
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: user.id,
-          title: "Միացար հնարավորությանը",
-          body: "+25 XP ստացար։",
-          kind: "success",
-        });
-      await supabase
-        .from("achievements")
-        .upsert(
-          { user_id: user.id, badge: "Առաջին մասնակցություն" },
-          { onConflict: "user_id,badge" },
-        );
+    if (joiningId) return;
+    setJoiningId(id);
+    try {
+      const { error } = await supabase.rpc("join_opportunity", {
+        _opportunity_id: id,
+      });
+      if (error) throw error;
+      setJoinedIds((current) => new Set([...current, id]));
+      toast.success("Միացար հնարավորությանը։ Այն ավելացվել է քո օրակարգում։");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց միանալ հնարավորությանը։"));
+    } finally {
+      setJoiningId(null);
     }
   }
 
@@ -86,7 +103,7 @@ function Opportunities() {
               <button
                 key={c}
                 onClick={() => setFilter(c)}
-                className={`chip px-3.5 py-2 rounded-full text-sm border transition-all capitalize ${filter === c ? "bg-gradient-hero text-primary-foreground border-transparent shadow-soft" : "bg-card border-border hover:border-primary/30"}`}
+                className={`chip min-h-11 px-3.5 py-2 rounded-full text-sm border transition-all capitalize ${filter === c ? "bg-gradient-hero text-primary-foreground border-transparent shadow-soft" : "bg-card border-border hover:border-primary/30"}`}
               >
                 {c === "all" ? "Բոլորը" : c}
               </button>
@@ -107,12 +124,16 @@ function Opportunities() {
             />
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 min-w-0 max-w-full overflow-hidden">
+          <div
+            ref={opportunityGridRef}
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 min-w-0 max-w-full overflow-hidden"
+          >
             {filtered.map((op) => {
               const joined = joinedIds.has(op.id);
               return (
                 <div
                   key={op.id}
+                  data-opportunity-id={op.id}
                   className="bg-gradient-card border border-border rounded-2xl p-4 sm:p-5 shadow-soft hover:shadow-elegant transition-shadow flex flex-col min-w-0"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2 mb-2 min-w-0">
@@ -141,10 +162,14 @@ function Opportunities() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => join(op.id)}
-                      disabled={joined}
+                      disabled={joined || joiningId !== null}
                       className={`flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all min-h-[44px] ${joined ? "bg-success/10 text-success cursor-default" : "bg-gradient-hero text-primary-foreground hover:shadow-glow active:scale-[0.98]"}`}
                     >
-                      {joined ? (
+                      {joiningId === op.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Միանում է…
+                        </>
+                      ) : joined ? (
                         <>
                           <CheckCircle2 className="w-4 h-4" /> Միացած ես
                         </>

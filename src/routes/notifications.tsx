@@ -1,34 +1,47 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { AlertTriangle, Bell, CheckCheck, Loader2 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { getErrorMessage } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/notifications")({ component: NotificationsPage });
 
 function NotificationsPage() {
   const { user, loading } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
+  const nav = useNavigate();
+  const [items, setItems] = useState<Tables<"notifications">[]>([]);
   const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (loading || !user) return;
+    if (loading) return;
+    if (!user) {
+      nav({ to: "/auth" });
+      return;
+    }
     (async () => {
-      const { data } = await supabase
+      setError(null);
+      const { data, error: loadError } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      setItems(data || []);
+      if (loadError) setError(getErrorMessage(loadError, "Ծանուցումները չհաջողվեց բեռնել։"));
+      else setItems(data || []);
       setBusy(false);
-      await supabase
+      if (loadError) return;
+      const { error: updateError } = await supabase
         .from("notifications")
         .update({ read: true })
         .eq("user_id", user.id)
         .eq("read", false);
+      if (updateError) toast.error("Ծանուցումների կարգավիճակը չհաջողվեց թարմացնել։");
     })();
-  }, [user, loading]);
+  }, [user, loading, nav]);
 
   if (loading || busy)
     return (
@@ -47,7 +60,13 @@ function NotificationsPage() {
             Ծանուցումներ
           </h1>
         </div>
-        {items.length === 0 ? (
+        {error ? (
+          <div className="text-center py-14 px-4 card-base rounded-2xl" role="alert">
+            <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-3" />
+            <h2 className="font-display text-base font-semibold">Ծանուցումները չբեռնվեցին</h2>
+            <p className="mt-1 text-sm text-muted-foreground break-words">{error}</p>
+          </div>
+        ) : items.length === 0 ? (
           <div className="text-center py-14 px-4 card-base rounded-2xl overflow-hidden animate-rise">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-secondary mb-3">
               <Bell className="w-5 h-5 text-muted-foreground" />
@@ -72,7 +91,7 @@ function NotificationsPage() {
                     )}
                   </div>
                   <span className="text-[11px] text-muted-foreground shrink-0 break-words">
-                    {new Date(n.created_at).toLocaleDateString()}
+                    {new Date(n.created_at).toLocaleDateString("hy-AM")}
                   </span>
                 </div>
               </div>

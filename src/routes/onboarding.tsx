@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { ALL_INTERESTS } from "@/lib/constants";
 import { Navbar } from "@/components/Navbar";
 import { ArrowRight, Loader2, Plus, X, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
 
@@ -64,9 +66,9 @@ function Onboarding() {
     if (!user) return;
     setSaving(true);
     try {
-      const { error: pErr } = await supabase.from("profiles").upsert(
-        {
-          id: user.id,
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .update({
           age: age === "" ? null : Number(age),
           school,
           bio,
@@ -76,34 +78,26 @@ function Onboarding() {
           goal,
           preferred_project_type: projectType,
           onboarded: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" },
-      );
+        })
+        .eq("id", user.id);
       if (pErr) {
         console.error("Profile save failed:", pErr);
-        alert("Չհաջողվեց պահպանել տվյալները՝ " + pErr.message);
+        toast.error("Չհաջողվեց պահպանել տվյալները", { description: pErr.message });
         setSaving(false);
         return;
       }
-      await supabase.from("notifications").insert({
-        user_id: user.id,
-        title: "Բարի գալուստ Էջմիածնի Երիտասարդական Տուն 🎉",
-        body: "Մուտքն ավարտված է։ Քո անհատականացված առաջարկները պատրաստվում են։",
-        kind: "info",
-      });
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        alert("Սեսիան ավարտվել է։ Խնդրում ենք նորից մուտք գործել։");
+        toast.error("Սեսիան ավարտվել է։ Խնդրում ենք նորից մուտք գործել։");
         nav({ to: "/auth" });
         return;
       }
       nav({ to: "/dashboard", replace: true });
-    } catch (e: any) {
-      console.error(e);
-      alert("Ինչ-որ բան սխալ գնաց՝ " + (e?.message ?? "անհայտ սխալ"));
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error(getErrorMessage(error, "Ինչ-որ բան սխալ գնաց"));
       setSaving(false);
     }
   }
@@ -114,28 +108,41 @@ function Onboarding() {
       content: (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5">Տարիք</label>
+            <label htmlFor="onboarding-age" className="block text-sm font-medium mb-1.5">
+              Տարիք
+            </label>
             <input
+              id="onboarding-age"
               type="number"
+              min={10}
+              max={100}
               value={age}
               onChange={(e) => setAge(e.target.value === "" ? "" : Number(e.target.value))}
               className="w-full min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5">Դպրոց / Համալսարան</label>
+            <label htmlFor="onboarding-school" className="block text-sm font-medium mb-1.5">
+              Դպրոց / Համալսարան
+            </label>
             <input
+              id="onboarding-school"
               value={school}
               onChange={(e) => setSchool(e.target.value)}
+              maxLength={200}
               className="w-full min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5">Կարճ ներկայացում</label>
+            <label htmlFor="onboarding-bio" className="block text-sm font-medium mb-1.5">
+              Կարճ ներկայացում
+            </label>
             <textarea
+              id="onboarding-bio"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               rows={3}
+              maxLength={2000}
               className="w-full min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background"
             />
           </div>
@@ -205,9 +212,13 @@ function Onboarding() {
                 value={customSkill}
                 onChange={(e) => setCustomSkill(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); addCustomSkill(); }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomSkill();
+                  }
                 }}
                 maxLength={40}
+                aria-label="Այլ հմտություն"
                 placeholder="Գրիր քո հմտությունը…"
                 className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm"
               />
@@ -232,6 +243,8 @@ function Onboarding() {
           value={learning}
           onChange={(e) => setLearning(e.target.value)}
           rows={4}
+          maxLength={100}
+          aria-label="Սովորելու ցանկալի ուղղություն"
           placeholder="օր.՝ վիդեո մոնտաժ, բիզնեսի հիմունքներ, AI գործիքներ․․․"
           className="w-full min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background"
         />
@@ -263,6 +276,8 @@ function Onboarding() {
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           rows={4}
+          maxLength={1000}
+          aria-label="Անձնական նպատակ"
           placeholder="Ի՞նչ ես ուզում նվաճել։"
           className="w-full min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background"
         />
@@ -295,7 +310,8 @@ function Onboarding() {
         {step === 0 && (
           <div className="flex items-center gap-2.5 mb-4 px-3.5 py-2.5 rounded-xl bg-primary/5 border border-primary/15 text-xs text-muted-foreground animate-rise">
             <Sparkles className="w-4 h-4 text-primary shrink-0" />
-            Այս պատասխանները քո անձնական AI մենթորը կօգտագործի՝ քեզ հարմար նախագծեր, դասընթացներ և հնարավորություններ առաջարկելու համար։
+            Այս պատասխանները քո անձնական AI մենթորը կօգտագործի՝ քեզ հարմար նախագծեր, դասընթացներ և
+            հնարավորություններ առաջարկելու համար։
           </div>
         )}
         <div className="card-base rounded-2xl p-4 sm:p-6 md:p-8 shadow-elegant overflow-hidden animate-rise">

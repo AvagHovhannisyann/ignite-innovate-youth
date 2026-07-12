@@ -44,22 +44,22 @@ export async function fetchAllThreads(): Promise<SupportThread[]> {
   const rows = (data || []) as SupportThread[];
   const ids = Array.from(new Set(rows.map((r) => r.user_id)));
   if (!ids.length) return rows;
-  const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-  const m = new Map((profs || []).map((p: any) => [p.id, p]));
+  const { data: profs } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", ids);
+  const m = new Map((profs || []).map((profile) => [profile.id, profile]));
   return rows.map((r) => ({ ...r, user: m.get(r.user_id) || null }));
 }
 
 export async function createThread(userId: string, subject: string, firstMessage: string) {
-  const { data: t, error } = await supabase
-    .from("support_threads")
-    .insert({ user_id: userId, subject: subject.trim() || "Աջակցության հարցում" })
-    .select("*")
-    .single();
+  if (!userId) throw new Error("Մուտք գործիր՝ հարցում ուղարկելու համար։");
+  const { data: thread, error } = await supabase.rpc("create_support_thread", {
+    _subject: subject.trim() || "Աջակցության հարցում",
+    _first_message: firstMessage.trim(),
+  });
   if (error) throw error;
-  if (firstMessage.trim()) {
-    await sendMessage(t.id, userId, "user", firstMessage);
-  }
-  return t as SupportThread;
+  return thread as SupportThread;
 }
 
 export async function fetchMessages(threadId: string): Promise<SupportMessage[]> {
@@ -72,14 +72,18 @@ export async function fetchMessages(threadId: string): Promise<SupportMessage[]>
   return (data || []) as SupportMessage[];
 }
 
-export async function sendMessage(threadId: string, senderId: string, role: "user" | "admin", content: string) {
-  const { error } = await supabase
-    .from("support_messages")
-    .insert({ thread_id: threadId, sender_id: senderId, sender_role: role, content: content.trim() });
+export async function sendMessage(threadId: string, content: string) {
+  const { error } = await supabase.rpc("send_support_message", {
+    _thread_id: threadId,
+    _content: content.trim(),
+  });
   if (error) throw error;
 }
 
 export async function setThreadStatus(threadId: string, status: SupportThread["status"]) {
-  const { error } = await supabase.from("support_threads").update({ status }).eq("id", threadId);
+  const { error } = await supabase.rpc("set_support_thread_status", {
+    _thread_id: threadId,
+    _status: status,
+  });
   if (error) throw error;
 }

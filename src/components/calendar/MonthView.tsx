@@ -87,7 +87,9 @@ export function MonthView({
                       }`}
                     />
                     <span className="text-[10px] leading-tight truncate">
-                      {!ev.allDay && <span className="text-muted-foreground">{fmtTime(ev.start)} </span>}
+                      {!ev.allDay && (
+                        <span className="text-muted-foreground">{fmtTime(ev.start)} </span>
+                      )}
                       {ev.title}
                     </span>
                   </div>

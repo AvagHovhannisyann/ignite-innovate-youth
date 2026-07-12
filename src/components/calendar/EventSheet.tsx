@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   KIND_META,
   KIND_ORDER,
@@ -64,7 +59,9 @@ export function EventSheet({
       setTitle("");
       setDescription("");
       setDate(toDateInput(target.start));
-      setEndDate(toDateInput(target.end.getTime() > target.start.getTime() ? target.end : target.start));
+      setEndDate(
+        toDateInput(target.end.getTime() > target.start.getTime() ? target.end : target.start),
+      );
       setStart(toTimeInput(target.start));
       setEnd(toTimeInput(target.end));
       setAllDay(!!target.allDay);
@@ -158,6 +155,8 @@ export function EventSheet({
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              aria-label="Իրադարձության վերնագիր"
               placeholder="Վերնագիր"
               className={inputCls}
             />
@@ -176,7 +175,12 @@ export function EventSheet({
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs text-muted-foreground">
                   Սկիզբ
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className={inputCls}
+                  />
                 </label>
                 <label className="text-xs text-muted-foreground">
                   Ավարտ
@@ -192,15 +196,30 @@ export function EventSheet({
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-end">
                 <label className="text-xs text-muted-foreground">
                   Ամսաթիվ
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className={inputCls}
+                  />
                 </label>
                 <label className="text-xs text-muted-foreground">
                   Սկիզբ
-                  <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={inputCls} />
+                  <input
+                    type="time"
+                    value={start}
+                    onChange={(e) => setStart(e.target.value)}
+                    className={inputCls}
+                  />
                 </label>
                 <label className="text-xs text-muted-foreground">
                   Ավարտ
-                  <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
+                  <input
+                    type="time"
+                    value={end}
+                    onChange={(e) => setEnd(e.target.value)}
+                    className={inputCls}
+                  />
                 </label>
               </div>
             )}
@@ -232,6 +251,8 @@ export function EventSheet({
               <input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                maxLength={300}
+                aria-label="Իրադարձության վայր"
                 placeholder="Վայր (ոչ պարտադիր)"
                 className={`${inputCls} pl-9`}
               />
@@ -242,6 +263,7 @@ export function EventSheet({
               <select
                 value={reminder ?? ""}
                 onChange={(e) => setReminder(e.target.value === "" ? null : Number(e.target.value))}
+                aria-label="Իրադարձության հիշեցում"
                 className={`${inputCls} pl-9 appearance-none`}
               >
                 {REMINDERS.map((r) => (
@@ -255,6 +277,8 @@ export function EventSheet({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              maxLength={4000}
+              aria-label="Իրադարձության նշումներ"
               placeholder="Նշումներ (ոչ պարտադիր)"
               rows={2}
               className={`${inputCls} resize-none`}

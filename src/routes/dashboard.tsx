@@ -1,9 +1,14 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
-import { callAI } from "@/lib/ai";
+import {
+  callAI,
+  parseRecommendations,
+  type ProjectIdea,
+  type RecommendationsResult,
+} from "@/lib/ai";
 import { levelFromXP } from "@/lib/constants";
 import { fmtDayMonth, fmtTime } from "@/lib/calendar";
 import { trackGlow } from "@/lib/glow";
@@ -28,15 +33,26 @@ import {
   BookOpen,
   Heart,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+
+type ParticipationWithOpportunity = Tables<"participations"> & {
+  opportunities: Pick<Tables<"opportunities">, "title" | "category" | "date"> | null;
+};
+
+type UpcomingEvent = Pick<
+  Tables<"schedule_events">,
+  "id" | "title" | "starts_at" | "ends_at" | "kind" | "all_day" | "location"
+>;
 
 export const Route = createFileRoute("/dashboard")({ component: Dashboard });
 
 function Dashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
-  const [recs, setRecs] = useState<any>(null);
+  const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
+  const [recs, setRecs] = useState<RecommendationsResult | null>(null);
   const [recsMeta, setRecsMeta] = useState<{
     aiUsed: boolean;
     model: string;
@@ -44,11 +60,33 @@ function Dashboard() {
   } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(false);
-  const [startedProjects, setStartedProjects] = useState<any[]>([]);
-  const [participations, setParticipations] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
+  const [startedProjects, setStartedProjects] = useState<Tables<"started_projects">[]>([]);
+  const [participations, setParticipations] = useState<ParticipationWithOpportunity[]>([]);
+  const [achievements, setAchievements] = useState<Tables<"achievements">[]>([]);
 
   useLevelUpCelebration(user?.id, profile?.xp);
+
+  const generate = useCallback(
+    async (currentProfile: Tables<"profiles">) => {
+      if (!user) return;
+      setGenerating(true);
+      setGenError(false);
+      try {
+        const { result, aiUsed, model, generatedAt } = await callAI("recommendations", {
+          profile: currentProfile,
+        });
+        setRecs(result);
+        setRecsMeta({ aiUsed, model, generatedAt });
+        if (aiUsed) burstConfetti(window.innerWidth / 2, 180, 36);
+      } catch (error: unknown) {
+        console.error(error);
+        setGenError(true);
+      } finally {
+        setGenerating(false);
+      }
+    },
+    [user],
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -83,62 +121,28 @@ function Dashboard() {
       setParticipations(parts || []);
       setAchievements(ach || []);
       if (cached) {
-        setRecs(cached.data);
-        setRecsMeta({
-          aiUsed: cached.source === "ai",
-          model: cached.source,
-          generatedAt: cached.generated_at,
-        });
-        // A previous generation failed and cached an empty ("not-generated")
-        // result — the AI may be healthy now, so retry once per browser
-        // session instead of leaving the student stuck on a blank section.
-        if (cached.source !== "ai" && !sessionStorage.getItem("ai-recs-retried")) {
-          sessionStorage.setItem("ai-recs-retried", "1");
+        try {
+          setRecs(parseRecommendations(cached.data));
+          setRecsMeta({
+            aiUsed: cached.source === "ai",
+            model: cached.source,
+            generatedAt: cached.generated_at,
+          });
+          // A previous generation failed and cached an empty ("not-generated")
+          // result — the AI may be healthy now, so retry once per browser session.
+          if (cached.source !== "ai" && !sessionStorage.getItem("ai-recs-retried")) {
+            sessionStorage.setItem("ai-recs-retried", "1");
+            void generate(prof);
+          }
+        } catch (error: unknown) {
+          console.warn("Discarding invalid cached recommendations", error);
           void generate(prof);
         }
       } else {
         void generate(prof);
       }
     })();
-  }, [user, loading, nav]);
-
-  async function generate(prof = profile) {
-    if (!prof || !user) return;
-    setGenerating(true);
-    setGenError(false);
-    try {
-      const { result, aiUsed, model, generatedAt } = await callAI("recommendations", {
-        profile: prof,
-      });
-      setRecs(result);
-      setRecsMeta({ aiUsed, model, generatedAt });
-      await supabase.from("recommendations").upsert(
-        {
-          user_id: user.id,
-          data: result,
-          source: aiUsed ? "ai" : "not-generated",
-          generated_at: generatedAt,
-        },
-        { onConflict: "user_id" },
-      );
-      if (aiUsed) {
-        burstConfetti(window.innerWidth / 2, 180, 36);
-        await supabase
-          .from("notifications")
-          .insert({
-            user_id: user.id,
-            title: "Նոր առաջարկները պատրաստ են",
-            body: "Ստուգիր քո անհատականացված դասերն ու նախագծերը։",
-            kind: "info",
-          });
-      }
-    } catch (e) {
-      console.error(e);
-      setGenError(true);
-    } finally {
-      setGenerating(false);
-    }
-  }
+  }, [user, loading, nav, generate]);
 
   function openSuggested(idx: number) {
     if (!recs?.suggestedProjects?.[idx]) return;
@@ -217,7 +221,10 @@ function Dashboard() {
                 {lvl.next && (
                   <div className="text-xs text-muted-foreground mt-1">
                     Հաջորդը՝ {lvl.next.name}
-                    <span className="block"><span className="tabular-nums">{lvl.next.min - (profile.xp || 0)}</span> XP մնաց</span>
+                    <span className="block">
+                      <span className="tabular-nums">{lvl.next.min - (profile.xp || 0)}</span> XP
+                      մնաց
+                    </span>
                   </div>
                 )}
               </div>
@@ -231,11 +238,15 @@ function Dashboard() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/25 text-sm text-destructive">
             <span>AI-ի հետ կապն ընդհատվեց, հավանաբար ծանրաբեռնվածության պատճառով։</span>
             <button
-              onClick={() => generate()}
+              onClick={() => profile && void generate(profile)}
               disabled={generating}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/15 hover:bg-destructive/25 font-medium disabled:opacity-50 shrink-0"
             >
-              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {generating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
               Կրկին փորձել
             </button>
           </div>
@@ -254,12 +265,12 @@ function Dashboard() {
             </span>
             {recsMeta && (
               <span className="break-words">
-                Թարմացված է՝ {new Date(recsMeta.generatedAt).toLocaleDateString()}
+                Թարմացված է՝ {new Date(recsMeta.generatedAt).toLocaleDateString("hy-AM")}
               </span>
             )}
           </div>
           <button
-            onClick={() => generate()}
+            onClick={() => profile && void generate(profile)}
             disabled={generating}
             className="btn btn-secondary w-full sm:w-auto min-w-0"
           >
@@ -280,7 +291,7 @@ function Dashboard() {
                 <Skeleton />
               ) : (
                 <div className="space-y-4">
-                  {(recs?.suggestedProjects || []).map((p: any, i: number) => (
+                  {(recs?.suggestedProjects || []).map((p, i) => (
                     <ProjectIdeaCard key={i} project={p} onOpen={() => openSuggested(i)} />
                   ))}
                   {recs?.suggestedProjects?.length === 0 && (
@@ -323,7 +334,7 @@ function Dashboard() {
 
             <Card title="Առաջարկվող դասեր" icon={GraduationCap} delay={180}>
               <List
-                items={(recs?.recommendedLessons || []).map((l: any) => ({
+                items={(recs?.recommendedLessons || []).map((l) => ({
                   title: l.title,
                   sub: l.reason,
                   badge: l.difficulty,
@@ -334,12 +345,12 @@ function Dashboard() {
             <Card title="Միջոցառումներ և մաստեր-դասեր" icon={Calendar} delay={240}>
               <List
                 items={[
-                  ...(recs?.recommendedEvents || []).map((e: any) => ({
+                  ...(recs?.recommendedEvents || []).map((e) => ({
                     title: e.title,
                     sub: e.reason,
                     badge: e.date,
                   })),
-                  ...(recs?.recommendedMasterclasses || []).map((m: any) => ({
+                  ...(recs?.recommendedMasterclasses || []).map((m) => ({
                     title: m.title,
                     sub: m.reason,
                     badge: m.skillFocus,
@@ -353,7 +364,7 @@ function Dashboard() {
           <div className="space-y-6 min-w-0 max-w-full overflow-hidden">
             <Card title="Աճի առաջարկներ" icon={Zap} delay={120}>
               <div className="space-y-2">
-                {(recs?.growthSuggestions || []).map((g: any, i: number) => (
+                {(recs?.growthSuggestions || []).map((g, i) => (
                   <div
                     key={i}
                     className="bg-card border border-border rounded-xl p-3 min-w-0 overflow-hidden"
@@ -403,7 +414,7 @@ function Dashboard() {
                     >
                       <span className="break-words min-w-0">{p.opportunities?.title}</span>
                       <span className="text-xs text-muted-foreground shrink-0">
-                        {new Date(p.joined_at).toLocaleDateString()}
+                        {new Date(p.joined_at).toLocaleDateString("hy-AM")}
                       </span>
                     </li>
                   ))}
@@ -482,7 +493,19 @@ function XPRing({ pct, level }: { pct: number; level: number }) {
   );
 }
 
-function Card({ title, icon: Icon, children, accent, delay = 0 }: any) {
+function Card({
+  title,
+  icon: Icon,
+  children,
+  accent,
+  delay = 0,
+}: {
+  title: string;
+  icon: LucideIcon;
+  children: ReactNode;
+  accent?: boolean;
+  delay?: number;
+}) {
   return (
     <section
       onMouseMove={trackGlow}
@@ -538,9 +561,9 @@ function Skeleton() {
   );
 }
 
-function ProjectIdeaCard({ project, onOpen }: { project: any; onOpen: () => void }) {
+function ProjectIdeaCard({ project, onOpen }: { project: ProjectIdea; onOpen: () => void }) {
   const [open, setOpen] = useState(false);
-  const milestones: any[] = project.milestones || [];
+  const milestones = project.milestones || [];
   const tools: string[] = project?.resources?.tools || [];
   const materials: string[] = project?.resources?.materials || [];
   const topics: string[] = project?.resources?.learningTopics || [];
@@ -732,7 +755,7 @@ function ProjectIdeaCard({ project, onOpen }: { project: any; onOpen: () => void
 
 /** Next few calendar events; events starting within an hour get a live badge. */
 function UpNext({ userId }: { userId: string }) {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<UpcomingEvent[]>([]);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -781,7 +804,9 @@ function UpNext({ userId }: { userId: string }) {
                 soon || live ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
-              <span className={`w-2 h-2 rounded-full shrink-0 ${KIND_DOT[e.kind] || KIND_DOT.other}`} />
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${KIND_DOT[e.kind] || KIND_DOT.other}`}
+              />
               <span className="text-sm font-medium truncate">{e.title}</span>
               <span className="text-xs text-muted-foreground shrink-0">
                 {e.all_day
@@ -805,7 +830,15 @@ function UpNext({ userId }: { userId: string }) {
   );
 }
 
-function MiniStat({ icon: Icon, label, value }: any) {
+function MiniStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="bg-secondary/60 rounded-lg p-2 min-w-0 overflow-hidden">
       <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wide min-w-0">

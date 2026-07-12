@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fromRow, type CalEvent, type EventKind } from "@/lib/calendar";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type EventDraft = {
   title: string;
@@ -13,8 +14,8 @@ export type EventDraft = {
   reminderMinutes?: number | null;
 };
 
-function toRow(userId: string, d: EventDraft) {
-  const row: Record<string, unknown> = {
+function toRow(userId: string, d: EventDraft): TablesInsert<"schedule_events"> {
+  const row: TablesInsert<"schedule_events"> = {
     user_id: userId,
     title: d.title,
     description: d.description || null,
@@ -39,6 +40,8 @@ export function useSchedule(userId: string | undefined) {
 
   const reload = useCallback(async () => {
     if (!userId) return;
+    setError(null);
+    setLoading(true);
     const { data, error } = await supabase
       .from("schedule_events")
       .select("*")
@@ -46,9 +49,11 @@ export function useSchedule(userId: string | undefined) {
       .order("starts_at");
     if (error) {
       setError(error.message);
+      setLoading(false);
       return;
     }
     setEvents((data || []).map(fromRow));
+    setLoading(false);
   }, [userId]);
 
   useEffect(() => {
@@ -76,7 +81,7 @@ export function useSchedule(userId: string | undefined) {
       if (!userId) return null;
       const { data, error } = await supabase
         .from("schedule_events")
-        .insert(toRow(userId, draft) as any)
+        .insert(toRow(userId, draft))
         .select()
         .single();
       if (error) throw error;
@@ -91,7 +96,7 @@ export function useSchedule(userId: string | undefined) {
   const update = useCallback(
     async (id: string, patch: Partial<EventDraft>) => {
       const prev = events;
-      const row: Record<string, unknown> = {};
+      const row: TablesUpdate<"schedule_events"> = {};
       if (patch.title !== undefined) row.title = patch.title;
       if (patch.description !== undefined) row.description = patch.description || null;
       if (patch.start !== undefined) row.starts_at = patch.start.toISOString();
@@ -109,7 +114,9 @@ export function useSchedule(userId: string | undefined) {
               ? {
                   ...e,
                   ...(patch.title !== undefined ? { title: patch.title } : {}),
-                  ...(patch.description !== undefined ? { description: patch.description ?? null } : {}),
+                  ...(patch.description !== undefined
+                    ? { description: patch.description ?? null }
+                    : {}),
                   ...(patch.start !== undefined ? { start: patch.start } : {}),
                   ...(patch.end !== undefined ? { end: patch.end } : {}),
                   ...(patch.allDay !== undefined ? { allDay: patch.allDay } : {}),
@@ -124,7 +131,7 @@ export function useSchedule(userId: string | undefined) {
           .sort((a, b) => a.start.getTime() - b.start.getTime()),
       );
 
-      const { error } = await supabase.from("schedule_events").update(row as any).eq("id", id);
+      const { error } = await supabase.from("schedule_events").update(row).eq("id", id);
       if (error) {
         setEvents(prev); // rollback
         throw error;
@@ -140,7 +147,10 @@ export function useSchedule(userId: string | undefined) {
       setEvents((list) => list.filter((e) => e.id !== id));
       const { error } = await supabase.from("schedule_events").delete().eq("id", id);
       if (error) {
-        if (target) setEvents((list) => [...list, target].sort((a, b) => a.start.getTime() - b.start.getTime()));
+        if (target)
+          setEvents((list) =>
+            [...list, target].sort((a, b) => a.start.getTime() - b.start.getTime()),
+          );
         throw error;
       }
       return async () => {
@@ -157,11 +167,14 @@ export function useSchedule(userId: string | undefined) {
               kind: target.kind,
               location: target.location,
               reminderMinutes: target.reminderMinutes,
-            }) as any,
+            }),
           )
           .select()
           .single();
-        if (data) setEvents((list) => [...list, fromRow(data)].sort((a, b) => a.start.getTime() - b.start.getTime()));
+        if (data)
+          setEvents((list) =>
+            [...list, fromRow(data)].sort((a, b) => a.start.getTime() - b.start.getTime()),
+          );
       };
     },
     [events, userId],

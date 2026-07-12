@@ -1,13 +1,44 @@
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import {
+  DefaultChatTransport,
+  isTextUIPart,
+  isToolUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  type DynamicToolUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MarkdownLite } from "@/lib/markdown-lite";
 import {
-  Send, Loader2, RotateCcw, ChevronDown, User as UserIcon, Calendar,
-  CalendarPlus, CalendarX, CalendarCog, Compass, UserPlus, MessageCircleQuestion,
-  Trophy, Lightbulb, Wrench, Rocket, Send as SendIcon, Ban, ListChecks, Bell,
-  MessageSquareText, Award, FileCheck, Sparkles, RefreshCw, AlertTriangle,
+  Send,
+  Loader2,
+  RotateCcw,
+  ChevronDown,
+  User as UserIcon,
+  Calendar,
+  CalendarPlus,
+  CalendarX,
+  CalendarCog,
+  Compass,
+  UserPlus,
+  MessageCircleQuestion,
+  Trophy,
+  Lightbulb,
+  Wrench,
+  Rocket,
+  Send as SendIcon,
+  Ban,
+  ListChecks,
+  Bell,
+  MessageSquareText,
+  Award,
+  FileCheck,
+  Sparkles,
+  RefreshCw,
+  AlertTriangle,
+  Check,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
@@ -66,9 +97,14 @@ function makeChatTransport(bearer: string | null, threadId: string) {
   });
 }
 
-function MessageBubble({ m }: { m: UIMessage }) {
-  const text = (m.parts || []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("");
-  const toolParts = (m.parts || []).filter((p: any) => typeof p.type === "string" && p.type.startsWith("tool-")) as any[];
+type ApprovalHandler = (id: string, approved: boolean) => void | PromiseLike<void>;
+
+function MessageBubble({ m, onApproval }: { m: UIMessage; onApproval: ApprovalHandler }) {
+  const text = (m.parts || [])
+    .filter(isTextUIPart)
+    .map((part) => part.text)
+    .join("");
+  const toolParts = (m.parts || []).filter(isToolUIPart);
 
   if (m.role === "user") {
     return (
@@ -83,7 +119,9 @@ function MessageBubble({ m }: { m: UIMessage }) {
     <div className="flex gap-2.5 sm:gap-3 mb-5">
       <img src={logo} alt="" className="w-8 h-8 rounded-full shrink-0 mt-0.5 shadow-soft" />
       <div className="flex-1 min-w-0 space-y-2">
-        {toolParts.map((p: any, i) => <ToolBlock key={i} part={p} />)}
+        {toolParts.map((part) => (
+          <ToolBlock key={part.toolCallId} part={part} onApproval={onApproval} />
+        ))}
         {text && (
           <div className="rounded-2xl rounded-tl-md bg-card border border-border/70 shadow-soft px-4 py-3 text-sm text-foreground break-words">
             <MarkdownLite text={text} />
@@ -94,13 +132,25 @@ function MessageBubble({ m }: { m: UIMessage }) {
   );
 }
 
-function ToolBlock({ part }: { part: any }) {
+function ToolBlock({
+  part,
+  onApproval,
+}: {
+  part: ToolUIPart | DynamicToolUIPart;
+  onApproval: ApprovalHandler;
+}) {
   const [open, setOpen] = useState(false);
-  const name = String(part.type || "").replace(/^tool-/, "");
+  const name = part.type === "dynamic-tool" ? part.toolName : part.type.replace(/^tool-/, "");
   const state = part.state || "input-available";
   const meta = TOOL_META[name] || { label: name, icon: Wrench };
   const done = state === "output-available";
   const failed = state === "output-error";
+  const approvalId = part.state === "approval-requested" ? part.approval.id : null;
+  const awaitingApproval =
+    part.state === "approval-requested" && !part.approval.isAutomatic && approvalId !== null;
+  const denied =
+    state === "output-denied" ||
+    (state === "approval-responded" && part.approval?.approved === false);
   return (
     <div className="rounded-xl border border-border bg-secondary/40 overflow-hidden">
       <button
@@ -108,17 +158,68 @@ function ToolBlock({ part }: { part: any }) {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-secondary/70"
       >
-        <meta.icon className={`w-3.5 h-3.5 shrink-0 ${failed ? "text-destructive" : "text-primary"}`} />
+        <meta.icon
+          className={`w-3.5 h-3.5 shrink-0 ${failed ? "text-destructive" : "text-primary"}`}
+        />
         <span className="truncate">{meta.label}</span>
-        <span className={`ml-auto shrink-0 ${done ? "text-success" : failed ? "text-destructive" : "text-muted-foreground"}`}>
-          {done ? "✓" : failed ? "Սխալ" : <Loader2 className="w-3 h-3 animate-spin" />}
+        <span
+          className={`ml-auto shrink-0 ${done ? "text-success" : failed || denied ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {done ? (
+            <Check className="h-3.5 w-3.5" aria-label="Կատարված" />
+          ) : failed ? (
+            "Սխալ"
+          ) : denied ? (
+            "Մերժված"
+          ) : awaitingApproval ? (
+            "Սպասում է քեզ"
+          ) : (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          )}
         </span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
+      {awaitingApproval && (
+        <div className="border-t border-border bg-accent/10 px-3 py-3">
+          <p className="text-xs text-foreground mb-2.5">
+            Այս գործողությունը կփոխի քո հաշվի տվյալները։ Ստուգիր մանրամասները և ընտրիր՝ շարունակե՞լ։
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => approvalId && void onApproval(approvalId, true)}
+              className="min-h-[40px] px-3.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
+            >
+              Հաստատել
+            </button>
+            <button
+              type="button"
+              onClick={() => approvalId && void onApproval(approvalId, false)}
+              className="min-h-[40px] px-3.5 rounded-lg border border-border bg-card text-xs font-semibold"
+            >
+              Չեղարկել
+            </button>
+          </div>
+        </div>
+      )}
       {open && (
         <div className="border-t border-border px-3 py-2 text-[11px] font-mono whitespace-pre-wrap break-words bg-background/60">
-          {part.input && <><div className="text-muted-foreground mb-1">input</div><pre className="text-foreground/80 overflow-auto max-h-40">{JSON.stringify(part.input, null, 2)}</pre></>}
-          {part.output && <><div className="text-muted-foreground mt-2 mb-1">output</div><pre className="text-foreground/80 overflow-auto max-h-40">{JSON.stringify(part.output, null, 2)}</pre></>}
+          {part.input !== undefined && (
+            <>
+              <div className="text-muted-foreground mb-1">Մուտքային տվյալներ</div>
+              <pre className="text-foreground/80 overflow-auto max-h-40">
+                {JSON.stringify(part.input, null, 2)}
+              </pre>
+            </>
+          )}
+          {part.output !== undefined && (
+            <>
+              <div className="text-muted-foreground mt-2 mb-1">Արդյունք</div>
+              <pre className="text-foreground/80 overflow-auto max-h-40">
+                {JSON.stringify(part.output, null, 2)}
+              </pre>
+            </>
+          )}
           {part.errorText && <div className="text-destructive">{part.errorText}</div>}
         </div>
       )}
@@ -139,16 +240,18 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
   const transport = useMemo(() => makeChatTransport(bearer, threadId), [bearer, threadId]);
   const chatId = bearer ? threadId : `${threadId}:pending-auth`;
 
-  const { messages, sendMessage, regenerate, clearError, status, error } = useChat({
-    id: chatId,
-    messages: initialMessages,
-    transport: makeChatTransport(bearer, threadId),
-    onError: (err) => {
-      // Network-level failures (never reached the server) don't carry the
-      // friendlier server-side message — normalize them here too.
-      console.error("chat client error", err);
-    },
-  });
+  const { messages, sendMessage, regenerate, clearError, addToolApprovalResponse, status, error } =
+    useChat({
+      id: chatId,
+      messages: initialMessages,
+      transport,
+      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+      onError: (err) => {
+        // Network-level failures (never reached the server) don't carry the
+        // friendlier server-side message — normalize them here too.
+        console.error("chat client error", err);
+      },
+    });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -166,7 +269,10 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
   // opportunity card) — send once a transport exists, only into a fresh thread.
   useEffect(() => {
     if (!autoAsk || !transport || messages.length > 0) return;
-    void sendMessage({ text: autoAsk }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } });
+    void sendMessage(
+      { text: autoAsk },
+      { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } },
+    );
     onAutoAskSent?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAsk, transport]);
@@ -177,14 +283,17 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
     const text = input.trim();
     if (!text || !transport) return;
     setInput("");
-    await sendMessage({ text }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } });
+    await sendMessage(
+      { text },
+      { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } },
+    );
   }
 
   const friendlyError =
     error &&
     (error.message?.includes("An error occurred")
-      ? "Ինչ-որ բան այն չգնաց։ Փորձիր կրկին։"
-      : error.message || "Ինչ-որ բան այն չգնաց։");
+      ? "Ինչ-որ բան այնպես չգնաց։ Փորձիր կրկին։"
+      : error.message || "Ինչ-որ բան այնպես չգնաց։");
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] max-w-3xl mx-auto w-full">
@@ -195,15 +304,18 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-success border-2 border-background" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-display text-sm font-semibold leading-tight">EYH Mentor</div>
-          <div className="text-[11px] text-muted-foreground truncate">Քո անձնական AI մենթորը · միշտ առցանց</div>
+          <div className="font-display text-sm font-semibold leading-tight">EYH օգնական</div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            Քո անձնական AI մենթորը · միշտ առցանց
+          </div>
         </div>
         <button
           onClick={onReset}
           className="shrink-0 inline-flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-2.5 rounded-lg hover:bg-secondary text-muted-foreground text-xs font-medium transition-colors"
           title="Մաքրել զրույցը"
         >
-          <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden min-[420px]:inline">Նոր</span>
+          <RotateCcw className="w-3.5 h-3.5" />{" "}
+          <span className="hidden min-[420px]:inline">Նոր</span>
         </button>
       </div>
 
@@ -212,11 +324,16 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
           <div className="text-center mt-6 sm:mt-10 animate-rise">
             <div className="relative inline-block mb-4">
               <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl scale-150" />
-              <img src={logo} alt="" className="relative w-16 h-16 object-contain mx-auto animate-float" />
+              <img
+                src={logo}
+                alt=""
+                className="relative w-16 h-16 object-contain mx-auto animate-float"
+              />
             </div>
             <div className="font-display text-xl mb-1.5">Բարև։ Ի՞նչ կօգնեմ այսօր։</div>
             <p className="text-xs text-muted-foreground mb-5 max-w-xs mx-auto">
-              Ես ճանաչում եմ քո պրոֆիլը, օրակարգը և քվեսթները, և կարող եմ իրականում գործել՝ ոչ միայն խորհուրդ տալ։
+              Ես ճանաչում եմ քո պրոֆիլը, օրակարգը և քվեսթները, և կարող եմ իրականում գործել՝ ոչ միայն
+              խորհուրդ տալ։
             </p>
 
             <div className="flex flex-wrap justify-center gap-1.5 mb-6">
@@ -236,7 +353,12 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
                   key={p.text}
                   type="button"
                   disabled={!transport}
-                  onClick={() => sendMessage({ text: p.text }, { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } })}
+                  onClick={() =>
+                    sendMessage(
+                      { text: p.text },
+                      { body: { threadId }, headers: { Authorization: `Bearer ${bearer}` } },
+                    )
+                  }
                   className="flex items-center gap-2.5 text-sm px-3.5 py-2.5 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-primary/5 transition-colors text-left disabled:opacity-50"
                 >
                   <p.icon className="w-4 h-4 text-primary shrink-0" />
@@ -246,10 +368,29 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
             </div>
           </div>
         )}
-        {messages.map((m) => <MessageBubble key={m.id} m={m} />)}
+        {messages.map((m) => (
+          <MessageBubble
+            key={m.id}
+            m={m}
+            onApproval={(id, approved) =>
+              addToolApprovalResponse({
+                id,
+                approved,
+                options: {
+                  body: { threadId },
+                  headers: { Authorization: `Bearer ${bearer}` },
+                },
+              })
+            }
+          />
+        ))}
         {status === "submitted" && (
           <div className="flex gap-2.5 sm:gap-3 mb-5">
-            <img src={logo} alt="" className="w-8 h-8 rounded-full shrink-0 mt-0.5 shadow-soft opacity-70" />
+            <img
+              src={logo}
+              alt=""
+              className="w-8 h-8 rounded-full shrink-0 mt-0.5 shadow-soft opacity-70"
+            />
             <div className="rounded-2xl rounded-tl-md bg-card border border-border/70 px-4 py-3 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.3s]" />
               <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.15s]" />
@@ -277,7 +418,10 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
       </div>
 
       <form
-        onSubmit={(e) => { e.preventDefault(); submit(); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
         className="border-t border-border p-2.5 sm:p-3 flex gap-2 items-end bg-background"
       >
         <textarea
@@ -285,9 +429,14 @@ export function AgentChat({ threadId, initialMessages, onReset, autoAsk, onAutoA
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
           }}
           rows={1}
+          maxLength={8000}
+          aria-label="AI օգնականին ուղղված հաղորդագրություն"
           placeholder="Գրիր հաղորդագրություն… (Enter՝ ուղարկելու, Shift+Enter՝ նոր տողի)"
           className="flex-1 resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-[152px]"
           disabled={busy}

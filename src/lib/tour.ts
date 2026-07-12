@@ -9,7 +9,7 @@ const SEEN_KEY = "eyh-tour-v1";
 const STEPS: DriveStep[] = [
   {
     popover: {
-      title: "Բարի գալուստ 🎉",
+      title: "Բարի գալուստ",
       description:
         "Սա քո անձնական հարթակն է․ 30 վայրկյանում ցույց կտանք գլխավորը։ Կարող ես բաց թողնել ցանկացած պահի։",
     },
@@ -25,14 +25,16 @@ const STEPS: DriveStep[] = [
     element: "[data-tour='nav-schedule']",
     popover: {
       title: "Օրակարգ",
-      description: "Իսկական օրացույց՝ ամիս/շաբաթ/օր/ցուցակ, drag-ով պլանավորում և Google/Apple համաժամեցում։",
+      description:
+        "Իսկական օրացույց՝ ամիս/շաբաթ/օր/ցուցակ, drag-ով պլանավորում և Google/Apple համաժամեցում։",
     },
   },
   {
     element: "[data-tour='nav-opportunities']",
     popover: {
       title: "Հնարավորություններ",
-      description: "Մրցույթներ, դասընթացներ, միջոցառումներ․ միացիր՝ և ամսաթվով իրադարձությունները կհայտնվեն օրակարգումդ։",
+      description:
+        "Մրցույթներ, դասընթացներ, միջոցառումներ․ միացիր՝ և ամսաթվով իրադարձությունները կհայտնվեն օրակարգումդ։",
     },
   },
   {
@@ -54,14 +56,16 @@ const STEPS: DriveStep[] = [
     element: "[data-tour='command-center']",
     popover: {
       title: "Արագ որոնում",
-      description: "⌘K (կամ այս կոճակը)՝ ցանկացած էջ կամ գործողություն մեկ վայրկյանում գտնելու համար։",
+      description:
+        "⌘K (կամ այս կոճակը)՝ ցանկացած էջ կամ գործողություն մեկ վայրկյանում գտնելու համար։",
     },
   },
   {
     element: "[data-tour='install-app']",
     popover: {
       title: "Տեղադրիր որպես հավելված",
-      description: "Մեկ սեղմումով ավելացրու հեռախոսիդ կամ համակարգչիդ էկրանին՝ որպես իսկական հավելված։",
+      description:
+        "Մեկ սեղմումով ավելացրու հեռախոսիդ կամ համակարգչիդ էկրանին՝ որպես իսկական հավելված։",
     },
   },
 ];
@@ -94,9 +98,9 @@ export function startTour() {
       steps.push(s);
       continue;
     }
-    const el = Array.from(
-      document.querySelectorAll<HTMLElement>(s.element as string),
-    ).find((e) => e.offsetParent !== null);
+    const el = Array.from(document.querySelectorAll<HTMLElement>(s.element as string)).find(
+      (e) => e.offsetParent !== null,
+    );
     if (el) steps.push({ ...s, element: el });
   }
   if (!steps.length) return;
@@ -105,7 +109,7 @@ export function startTour() {
     showProgress: true,
     nextBtnText: "Հաջորդ",
     prevBtnText: "Նախորդ",
-    doneBtnText: "Պատրաստ է ✓",
+    doneBtnText: "Պատրաստ է",
     progressText: "{{current}} / {{total}}",
     onDestroyed: () => markTourSeen(),
   });

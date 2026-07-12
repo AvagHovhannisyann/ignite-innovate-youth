@@ -20,7 +20,10 @@ export const Route = createFileRoute("/api/google/status")({
             connected = data?.status === "connected";
           }
         }
-        return Response.json({ configured, connected });
+        return Response.json(
+          { configured, connected },
+          { headers: { "Cache-Control": "no-store, max-age=0" } },
+        );
       },
     },
   },

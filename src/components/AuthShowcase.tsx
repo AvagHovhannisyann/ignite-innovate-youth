@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { useAutoplayGuard } from "@/components/remotion-autoplay";
 import logo from "@/assets/logo.png";
+import { Check, Handshake, Leaf, Palette, Rocket, Target, Trophy } from "lucide-react";
 
 const Player = lazy(() => import("@remotion/player").then((m) => ({ default: m.Player })));
 
@@ -69,7 +70,7 @@ function QuestScene() {
               fontSize: 22,
             }}
           >
-            🎯
+            <Target size={22} strokeWidth={2.4} />
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 17 }}>Օրվա քվեստ</div>
@@ -89,7 +90,7 @@ function QuestScene() {
               fontWeight: 800,
             }}
           >
-            ✓
+            <Check size={18} strokeWidth={3} />
           </div>
         </div>
         <div
@@ -257,7 +258,7 @@ function BadgeScene() {
   const { local, active, enter, exit } = useScene(190, DURATION);
   if (!active) return null;
 
-  const BADGES = ["🏆", "🚀", "🎨", "🌱", "🤝"];
+  const BADGES = [Trophy, Rocket, Palette, Leaf, Handshake];
   return (
     <AbsoluteFill
       style={{
@@ -279,7 +280,7 @@ function BadgeScene() {
           filter: "drop-shadow(0 20px 50px oklch(0.2 0.1 250 / 0.6))",
         }}
       />
-      {BADGES.map((b, i) => {
+      {BADGES.map((Icon, i) => {
         const s = spring({
           frame: local - 8 - i * 5,
           fps,
@@ -288,7 +289,7 @@ function BadgeScene() {
         const angle = (i / BADGES.length) * Math.PI * 2 - Math.PI / 2;
         return (
           <div
-            key={b}
+            key={Icon.displayName || i}
             style={{
               position: "absolute",
               left: "50%",
@@ -297,7 +298,7 @@ function BadgeScene() {
               transform: `translate(-50%, -50%) translate(${Math.cos(angle) * 120 * s}px, ${Math.sin(angle) * 120 * s}px) scale(${s})`,
             }}
           >
-            {b}
+            <Icon size={30} strokeWidth={2.2} />
           </div>
         );
       })}

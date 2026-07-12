@@ -1,11 +1,19 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
-import { createPost, updatePost, uploadMedia, signMedia } from "@/lib/feed";
+import {
+  createPost,
+  updatePost,
+  uploadMedia,
+  signMedia,
+  removeMediaFiles,
+  MAX_POST_MEDIA_FILES,
+} from "@/lib/feed";
 import { ArrowLeft, ImagePlus, Loader2, MapPin, Tag, X, Video, Send } from "lucide-react";
+import { getErrorMessage } from "@/lib/utils";
 
 const searchSchema = z.object({ edit: z.string().optional() });
 
@@ -29,6 +37,19 @@ function CreatePostPage() {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const draftUploads = useRef(new Set<string>());
+
+  useEffect(
+    () => () => {
+      const abandoned = Array.from(draftUploads.current);
+      if (abandoned.length) {
+        void removeMediaFiles(abandoned).catch((cleanupError: unknown) =>
+          console.error("Could not clean up abandoned post draft", cleanupError),
+        );
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -62,28 +83,49 @@ function CreatePostPage() {
     if (!user) return;
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    if (mediaPaths.length + files.length > MAX_POST_MEDIA_FILES) {
+      setError(`Կարելի է կցել առավելագույնը ${MAX_POST_MEDIA_FILES} մեդիա ֆայլ։`);
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     setError(null);
+    const uploaded: { path: string; type: string }[] = [];
     try {
-      const uploaded = await Promise.all(files.map((f) => uploadMedia(user.id, f)));
+      for (const file of files) uploaded.push(await uploadMedia(user.id, file));
       const newPaths = uploaded.map((u) => u.path);
+      newPaths.forEach((path) => draftUploads.current.add(path));
       const newTypes = uploaded.map((u) => u.type);
       const signed = await signMedia(newPaths);
       setMediaPaths((p) => [...p, ...newPaths]);
       setMediaTypes((t) => [...t, ...newTypes]);
       setPreviews((p) => [...p, ...signed]);
-    } catch (err: any) {
-      setError(err.message || "Չհաջողվեց վերբեռնել ֆայլը");
+    } catch (error: unknown) {
+      try {
+        await removeMediaFiles(uploaded.map((item) => item.path));
+      } catch (cleanupError: unknown) {
+        console.error("Could not clean up interrupted post upload", cleanupError);
+      }
+      setError(getErrorMessage(error, "Չհաջողվեց վերբեռնել ֆայլը"));
     } finally {
       setUploading(false);
       e.target.value = "";
     }
   }
 
-  function removeMedia(i: number) {
+  async function removeMedia(i: number) {
+    const path = mediaPaths[i];
     setMediaPaths((p) => p.filter((_, idx) => idx !== i));
     setMediaTypes((t) => t.filter((_, idx) => idx !== i));
     setPreviews((p) => p.filter((_, idx) => idx !== i));
+    if (path && draftUploads.current.has(path)) {
+      draftUploads.current.delete(path);
+      try {
+        await removeMediaFiles([path]);
+      } catch (cleanupError: unknown) {
+        console.error("Could not remove discarded draft media", cleanupError);
+      }
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -121,9 +163,10 @@ function CreatePostPage() {
           location: location.trim() || null,
         });
       }
-      nav({ to: "/profile", search: { tab: "posts" } as any });
-    } catch (err: any) {
-      setError(err.message || "Չհաջողվեց ուղարկել գրառումը");
+      draftUploads.current.clear();
+      nav({ to: "/profile" });
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Չհաջողվեց ուղարկել գրառումը"));
     } finally {
       setSubmitting(false);
     }
@@ -158,10 +201,14 @@ function CreatePostPage() {
 
         <form onSubmit={submit} className="space-y-4 card-base rounded-2xl p-4 sm:p-6">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            <label
+              htmlFor="post-title"
+              className="block text-xs font-medium text-muted-foreground mb-1.5"
+            >
               Վերնագիր (ոչ պարտադիր)
             </label>
             <input
+              id="post-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={120}
@@ -170,8 +217,14 @@ function CreatePostPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Տեքստ</label>
+            <label
+              htmlFor="post-content"
+              className="block text-xs font-medium text-muted-foreground mb-1.5"
+            >
+              Տեքստ
+            </label>
             <textarea
+              id="post-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={5}
@@ -196,15 +249,23 @@ function CreatePostPage() {
                     className="relative aspect-square bg-secondary rounded-lg overflow-hidden"
                   >
                     {mediaTypes[i] === "video" ? (
-                      <video src={src} className="w-full h-full object-cover" />
+                      <video
+                        src={src}
+                        aria-label={`Կցված տեսանյութ ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={src}
+                        alt={`Կցված նկար ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     )}
                     <button
                       type="button"
-                      onClick={() => removeMedia(i)}
-                      aria-label="Հեռացնել"
-                      className="absolute top-1 right-1 w-9 h-9 rounded-full bg-background/90 text-foreground grid place-items-center shadow-soft"
+                      onClick={() => void removeMedia(i)}
+                      aria-label={`Հեռացնել կցված ֆայլ ${i + 1}`}
+                      className="absolute top-1 right-1 w-11 h-11 rounded-full bg-background/90 text-foreground grid place-items-center shadow-soft"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -216,6 +277,7 @@ function CreatePostPage() {
               </div>
             )}
             <label
+              aria-label="Կցել մեդիա ֆայլեր"
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-dashed border-border text-sm cursor-pointer hover:bg-secondary min-h-[44px] ${uploading ? "opacity-50 pointer-events-none" : ""}`}
             >
               {uploading ? (
@@ -227,7 +289,7 @@ function CreatePostPage() {
               <input
                 type="file"
                 multiple
-                accept="image/*,video/*"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
                 className="hidden"
                 onChange={onFiles}
               />
@@ -236,12 +298,16 @@ function CreatePostPage() {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <label
+                htmlFor="post-tags"
+                className="block text-xs font-medium text-muted-foreground mb-1.5"
+              >
                 Թեգեր (ստորակետով)
               </label>
               <div className="relative">
                 <Tag className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
+                  id="post-tags"
                   value={tagsInput}
                   onChange={(e) => setTagsInput(e.target.value)}
                   placeholder="երաժշտություն, արվեստ"
@@ -250,12 +316,16 @@ function CreatePostPage() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <label
+                htmlFor="post-location"
+                className="block text-xs font-medium text-muted-foreground mb-1.5"
+              >
                 Վայր (ոչ պարտադիր)
               </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
+                  id="post-location"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="Էջմիածին"
@@ -266,7 +336,10 @@ function CreatePostPage() {
           </div>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3 break-words">
+            <div
+              role="alert"
+              className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3 break-words"
+            >
               {error}
             </div>
           )}

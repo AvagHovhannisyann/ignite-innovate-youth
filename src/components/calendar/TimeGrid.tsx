@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
   allDayEventsForDay,
@@ -20,17 +20,15 @@ const HOUR_H = 48; // px per hour
 const DAY_MIN = 24 * 60;
 const GRID_H = 24 * HOUR_H;
 
-type DragState =
-  | null
-  | {
-      mode: "create" | "move" | "resize";
-      id?: string;
-      dayIndex: number;
-      startMin: number;
-      endMin: number;
-      grabOffsetMin?: number; // for move: pointer offset from event start
-      moved: boolean;
-    };
+type DragState = null | {
+  mode: "create" | "move" | "resize";
+  id?: string;
+  dayIndex: number;
+  startMin: number;
+  endMin: number;
+  grabOffsetMin?: number; // for move: pointer offset from event start
+  moved: boolean;
+};
 
 export function TimeGrid({
   days,
@@ -66,20 +64,23 @@ export function TimeGrid({
     return () => clearInterval(t);
   }, []);
 
-  function pointerMinutes(clientY: number): number {
+  const pointerMinutes = useCallback((clientY: number): number => {
     // colsRef sits inside the scroll container, so its rect is already
     // scroll-adjusted (viewport-relative).
     const rect = colsRef.current!.getBoundingClientRect();
     const y = clientY - rect.top;
     const raw = (y / GRID_H) * DAY_MIN;
     return Math.max(0, Math.min(DAY_MIN, snapMinutes(raw)));
-  }
-  function pointerDayIndex(clientX: number): number {
-    const el = colsRef.current!;
-    const rect = el.getBoundingClientRect();
-    const w = rect.width / days.length;
-    return Math.max(0, Math.min(days.length - 1, Math.floor((clientX - rect.left) / w)));
-  }
+  }, []);
+  const pointerDayIndex = useCallback(
+    (clientX: number): number => {
+      const el = colsRef.current!;
+      const rect = el.getBoundingClientRect();
+      const w = rect.width / days.length;
+      return Math.max(0, Math.min(days.length - 1, Math.floor((clientX - rect.left) / w)));
+    },
+    [days.length],
+  );
 
   // ---- gesture lifecycle ----
   useEffect(() => {
@@ -131,7 +132,7 @@ export function TimeGrid({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
     };
-  }, [drag, days, onCreate, onUpdate]);
+  }, [drag, days, onCreate, onUpdate, pointerDayIndex, pointerMinutes]);
 
   function startCreate(e: React.PointerEvent, dayIndex: number) {
     if (e.button !== 0) return;
@@ -147,7 +148,15 @@ export function TimeGrid({
     const s = minutesSinceMidnight(ev.start);
     const eMin = Math.min(DAY_MIN, s + Math.round((ev.end.getTime() - ev.start.getTime()) / 60000));
     const grab = pointerMinutes(e.clientY) - s;
-    setDrag({ mode: "move", id: ev.id, dayIndex, startMin: s, endMin: eMin, grabOffsetMin: grab, moved: false });
+    setDrag({
+      mode: "move",
+      id: ev.id,
+      dayIndex,
+      startMin: s,
+      endMin: eMin,
+      grabOffsetMin: grab,
+      moved: false,
+    });
   }
   function startResize(e: React.PointerEvent, ev: CalEvent, dayIndex: number) {
     e.stopPropagation();

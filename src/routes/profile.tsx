@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
@@ -30,7 +30,32 @@ import {
   Coins,
   LifeBuoy,
   X,
+  Star,
+  Activity,
+  type LucideIcon,
 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+type ParticipationWithOpportunity = Tables<"participations"> & {
+  opportunities: Pick<Tables<"opportunities">, "title" | "category" | "date"> | null;
+};
+
+type QuestAward = Pick<Tables<"user_quests">, "template_id" | "awarded_at"> & {
+  quest_templates: Pick<Tables<"quest_templates">, "title" | "xp"> | null;
+};
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -53,30 +78,39 @@ const AVAILABILITY = [
   "Երեկոյան",
   "Ճկուն",
 ];
+const RANK_LABELS: Record<string, string> = {
+  Unranked: "Առանց վարկանիշի",
+  Bronze: "Բրոնզե",
+  Silver: "Արծաթե",
+  Gold: "Ոսկե",
+  Platinum: "Պլատինե",
+  Diamond: "Ադամանդե",
+};
 
 function ProfilePage() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
 
-  const [profile, setProfile] = useState<any>(null);
-  const [participations, setParticipations] = useState<any[]>([]);
-  const [startedProjects, setStartedProjects] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
+  const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
+  const [participations, setParticipations] = useState<ParticipationWithOpportunity[]>([]);
+  const [startedProjects, setStartedProjects] = useState<Tables<"started_projects">[]>([]);
+  const [achievements, setAchievements] = useState<Tables<"achievements">[]>([]);
   const [myPosts, setMyPosts] = useState<Post[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
-  const [rank, setRank] = useState<any>(null);
-  const [questAwards, setQuestAwards] = useState<any[]>([]);
+  const [rank, setRank] = useState<Awaited<ReturnType<typeof fetchUserRank>> | null>(null);
+  const [questAwards, setQuestAwards] = useState<QuestAward[]>([]);
   const [showCustomSkill, setShowCustomSkill] = useState(false);
   const [customSkill, setCustomSkill] = useState("");
 
   function addCustomSkill() {
     const v = customSkill.trim();
     if (!v) return;
-    setProfile((p: any) => {
-      const cur: string[] = p.skills || [];
-      if (cur.some((s) => s.toLowerCase() === v.toLowerCase())) return p;
-      return { ...p, skills: [...cur, v] };
+    setProfile((current) => {
+      if (!current) return current;
+      const skills = current.skills || [];
+      if (skills.some((skill) => skill.toLowerCase() === v.toLowerCase())) return current;
+      return { ...current, skills: [...skills, v] };
     });
     setCustomSkill("");
   }
@@ -121,7 +155,8 @@ function ProfilePage() {
             .eq("awarded", true)
             .order("awarded_at", { ascending: false }),
         ]);
-      setProfile(prof || { id: user.id, email: user.email, interests: [], skills: [] });
+      const resolvedProfile = prof ?? (await supabase.rpc("ensure_my_profile")).data;
+      setProfile(resolvedProfile);
       setParticipations(parts || []);
       setStartedProjects(sp || []);
       setAchievements(ach || []);
@@ -129,17 +164,23 @@ function ProfilePage() {
       void loadMyPosts(user.id);
       fetchUserRank(user.id)
         .then(setRank)
-        .catch(() => {});
+        .catch((error: unknown) => console.error("Could not load profile rank", error));
     })();
   }, [user, loading, nav]);
 
-  function set<K extends string>(k: K, v: any) {
-    setProfile((p: any) => ({ ...p, [k]: v }));
+  function set<K extends keyof Tables<"profiles">>(key: K, value: Tables<"profiles">[K]) {
+    setProfile((current) => (current ? { ...current, [key]: value } : current));
   }
   function toggle(field: "interests" | "skills", item: string) {
-    setProfile((p: any) => {
-      const cur: string[] = p[field] || [];
-      return { ...p, [field]: cur.includes(item) ? cur.filter((x) => x !== item) : [...cur, item] };
+    setProfile((current) => {
+      if (!current) return current;
+      const values = current[field] || [];
+      return {
+        ...current,
+        [field]: values.includes(item)
+          ? values.filter((value) => value !== item)
+          : [...values, item],
+      };
     });
   }
 
@@ -160,7 +201,6 @@ function ProfilePage() {
         goal: profile.goal,
         availability: profile.availability,
         preferred_project_type: profile.preferred_project_type,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
     setSaving(false);
@@ -173,18 +213,24 @@ function ProfilePage() {
   // — no separate transactions table needed. Must run before the early
   // return below so hook order stays consistent across renders.
   const xpHistory = useMemo(() => {
-    type Entry = { date: string; label: string; amount: number; icon: any };
+    type Entry = { date: string; label: string; amount: number; icon: LucideIcon };
     const out: Entry[] = [];
     for (const p of startedProjects) {
       if (p.xp_cost) {
-        out.push({ date: p.created_at, label: `Սկսվեց՝ «${p.title}»`, amount: -p.xp_cost, icon: Rocket });
+        out.push({
+          date: p.created_at,
+          label: `Սկսվեց՝ «${p.title}»`,
+          amount: -p.xp_cost,
+          icon: Rocket,
+        });
       }
       if (p.status === "approved" && p.approved_at) {
         const award = p.quality === "exceptional" ? p.xp_reward_exceptional : p.xp_reward_standard;
         if (award) {
           out.push({
             date: p.approved_at,
-            label: p.quality === "exceptional" ? `Բացառիկ՝ «${p.title}»` : `Հաստատվեց՝ «${p.title}»`,
+            label:
+              p.quality === "exceptional" ? `Բացառիկ՝ «${p.title}»` : `Հաստատվեց՝ «${p.title}»`,
             amount: award,
             icon: CheckCircle2,
           });
@@ -231,8 +277,8 @@ function ProfilePage() {
               <p className="text-sm text-muted-foreground break-all">{profile.email}</p>
               <div className="flex flex-wrap items-center gap-2 mt-3">
                 <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold border border-primary/30">
-                  <Award className="w-3.5 h-3.5" /> {rank?.tier || "Unranked"} · {rank?.score ?? 0}{" "}
-                  միավոր
+                  <Award className="w-3.5 h-3.5" /> {RANK_LABELS[rank?.tier || "Unranked"]} ·{" "}
+                  {rank?.score ?? 0} միավոր
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-accent text-accent-foreground">
                   <Coins className="w-3.5 h-3.5" /> {profile.xp || 0} XP
@@ -245,11 +291,23 @@ function ProfilePage() {
                 </Link>
               </div>
               {rank && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-[11px] text-muted-foreground">
-                  <span>✅ Հաստատված՝ {rank.completed}</span>
-                  <span>🌟 Բացառիկ՝ {rank.exceptional}</span>
-                  <span>⭐ Միջին գնահ.՝ {rank.avg_rating}</span>
-                  <span>⚡ Ակտիվ.՝ {rank.activity}</span>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground sm:grid-cols-4">
+                  <span className="inline-flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Հաստատված՝ {rank.completed}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Բացառիկ՝ {rank.exceptional}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Միջին գնահ.՝ {rank.avg_rating}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Ակտիվ.՝ {rank.activity}
+                  </span>
                 </div>
               )}
             </div>
@@ -278,6 +336,8 @@ function ProfilePage() {
                   <input
                     value={profile.full_name || ""}
                     onChange={(e) => set("full_name", e.target.value)}
+                    maxLength={120}
+                    aria-label="Անուն Ազգանուն"
                     className={inputCls}
                   />
                 </Field>
@@ -288,6 +348,7 @@ function ProfilePage() {
                     max={100}
                     value={profile.age || ""}
                     onChange={(e) => set("age", e.target.value ? Number(e.target.value) : null)}
+                    aria-label="Տարիք"
                     className={inputCls}
                   />
                 </Field>
@@ -305,6 +366,8 @@ function ProfilePage() {
                     <input
                       value={profile.phone || ""}
                       onChange={(e) => set("phone", e.target.value)}
+                      maxLength={40}
+                      aria-label="Հեռախոս"
                       className={`${inputCls} pl-9`}
                       placeholder="+374 ..."
                     />
@@ -316,6 +379,8 @@ function ProfilePage() {
                     <input
                       value={profile.school || ""}
                       onChange={(e) => set("school", e.target.value)}
+                      maxLength={200}
+                      aria-label="Դպրոց կամ համալսարան"
                       className={`${inputCls} pl-9`}
                     />
                   </div>
@@ -325,6 +390,8 @@ function ProfilePage() {
                     rows={3}
                     value={profile.bio || ""}
                     onChange={(e) => set("bio", e.target.value)}
+                    maxLength={2000}
+                    aria-label="Կարճ ներկայացում"
                     className={inputCls}
                     placeholder="Մեկ-երկու նախադասությամբ քո մասին։"
                   />
@@ -339,6 +406,8 @@ function ProfilePage() {
                     rows={2}
                     value={profile.goal || ""}
                     onChange={(e) => set("goal", e.target.value)}
+                    maxLength={1000}
+                    aria-label="Անձնական նպատակ"
                     className={inputCls}
                     placeholder="Ի՞նչ ես ուզում ստեղծել կամ սովորել հաջորդիվ։"
                   />
@@ -347,6 +416,7 @@ function ProfilePage() {
                   <select
                     value={profile.availability || ""}
                     onChange={(e) => set("availability", e.target.value)}
+                    aria-label="Հասանելիություն"
                     className={inputCls}
                   >
                     <option value="">Ընտրել…</option>
@@ -361,6 +431,7 @@ function ProfilePage() {
                   <select
                     value={profile.preferred_project_type || ""}
                     onChange={(e) => set("preferred_project_type", e.target.value)}
+                    aria-label="Նախընտրելի նախագծի տեսակ"
                     className={inputCls}
                   >
                     <option value="">Ընտրել…</option>
@@ -443,9 +514,13 @@ function ProfilePage() {
                     value={customSkill}
                     onChange={(e) => setCustomSkill(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); addCustomSkill(); }
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomSkill();
+                      }
                     }}
                     maxLength={40}
+                    aria-label="Այլ հմտություն"
                     placeholder="Գրիր քո հմտությունը…"
                     className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm"
                   />
@@ -462,9 +537,13 @@ function ProfilePage() {
             </Section>
 
             <div className="sticky bottom-28 md:bottom-4 z-10 flex flex-col min-[420px]:flex-row items-stretch min-[420px]:items-center justify-between gap-3 card-base rounded-2xl p-3 sm:p-4 shadow-elegant overflow-hidden">
-              <div className="text-xs sm:text-sm text-muted-foreground min-w-0 flex-1">
+              <div
+                className="text-xs sm:text-sm text-muted-foreground min-w-0 flex-1"
+                aria-live="polite"
+              >
                 {status ? (
                   <span
+                    role={status.kind === "ok" ? "status" : "alert"}
                     className={`inline-flex items-center gap-1.5 ${status.kind === "ok" ? "text-success" : "text-destructive"}`}
                   >
                     {status.kind === "ok" ? (
@@ -523,7 +602,7 @@ function ProfilePage() {
                         </div>
                       </div>
                       <span className="text-[10px] text-muted-foreground shrink-0">
-                        {new Date(p.joined_at).toLocaleDateString()}
+                        {new Date(p.joined_at).toLocaleDateString("hy-AM")}
                       </span>
                     </li>
                   ))}
@@ -591,9 +670,17 @@ function ProfilePage() {
               )}
             </Section>
 
-            <Section id="xp-history" title="XP պատմություն" subtitle="Որտեղից է եկել և ուր է գնացել քո XP-ն" icon={Coins}>
+            <Section
+              id="xp-history"
+              title="XP պատմություն"
+              subtitle="Որտեղից է եկել և ուր է գնացել քո XP-ն"
+              icon={Coins}
+            >
               {xpHistory.length === 0 ? (
-                <EmptyState icon={Coins} text="XP փոփոխություններ դեռ չկան։ Ավարտիր քվեսթ կամ սկսիր նախագիծ։" />
+                <EmptyState
+                  icon={Coins}
+                  text="XP փոփոխություններ դեռ չկան։ Ավարտիր քվեսթ կամ սկսիր նախագիծ։"
+                />
               ) : (
                 <ul className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
                   {xpHistory.map((e, i) => (
@@ -603,7 +690,9 @@ function ProfilePage() {
                     >
                       <div
                         className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${
-                          e.amount >= 0 ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground"
+                          e.amount >= 0
+                            ? "bg-success/10 text-success"
+                            : "bg-secondary text-muted-foreground"
                         }`}
                       >
                         <e.icon className="w-4 h-4" />
@@ -611,10 +700,16 @@ function ProfilePage() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{e.label}</div>
                         <div className="text-[11px] text-muted-foreground">
-                          {new Date(e.date).toLocaleDateString("hy-AM", { day: "numeric", month: "short", year: "numeric" })}
+                          {new Date(e.date).toLocaleDateString("hy-AM", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
                         </div>
                       </div>
-                      <div className={`text-sm font-semibold shrink-0 tabular-nums ${e.amount >= 0 ? "text-success" : "text-muted-foreground"}`}>
+                      <div
+                        className={`text-sm font-semibold shrink-0 tabular-nums ${e.amount >= 0 ? "text-success" : "text-muted-foreground"}`}
+                      >
                         {e.amount >= 0 ? "+" : ""}
                         {e.amount} XP
                       </div>
@@ -664,24 +759,46 @@ function ProfilePage() {
                         {(p.status === "rejected" || p.status === "pending") && (
                           <Link
                             to="/feed/create"
-                            search={{ edit: p.id } as any}
+                            search={{ edit: p.id }}
                             className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-card border border-border hover:bg-secondary min-h-[44px]"
                           >
                             <Pencil className="w-3 h-3" /> Խմբագրել
                           </Link>
                         )}
-                        <button
-                          onClick={async () => {
-                            if (!confirm("Ջնջե՞լ այս գրառումը։")) return;
-                            await deletePost(p.id);
-                            if (user) void loadMyPosts(user.id);
-                          }}
-                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-card border border-border hover:bg-destructive/10 hover:text-destructive min-h-[44px]"
-                        >
-                          <Trash2 className="w-3 h-3" /> Ջնջել
-                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-card border border-border hover:bg-destructive/10 hover:text-destructive min-h-[44px]">
+                              <Trash2 className="w-3 h-3" /> Ջնջել
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Ջնջե՞լ գրառումը</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Գրառումն ու դրա մեկնաբանությունները կջնջվեն ընդմիշտ։
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Չեղարկել</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={async () => {
+                                  try {
+                                    await deletePost(p.id);
+                                    if (user) await loadMyPosts(user.id);
+                                    toast.success("Գրառումը ջնջված է։");
+                                  } catch (error: unknown) {
+                                    toast.error(getErrorMessage(error, "Չհաջողվեց ջնջել գրառումը"));
+                                  }
+                                }}
+                              >
+                                Ջնջել ընդմիշտ
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                         <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
-                          {new Date(p.created_at).toLocaleDateString()}
+                          {new Date(p.created_at).toLocaleDateString("hy-AM")}
                         </span>
                       </div>
                     </li>
@@ -711,7 +828,17 @@ function ProfilePage() {
 const inputCls =
   "w-full max-w-full px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition min-h-[44px]";
 
-function Field({ label, hint, children, className = "" }: any) {
+function Field({
+  label,
+  hint,
+  children,
+  className = "",
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-muted-foreground mb-1.5">{label}</label>
@@ -721,9 +848,24 @@ function Field({ label, hint, children, className = "" }: any) {
   );
 }
 
-function Section({ id, title, subtitle, icon: Icon, children }: any) {
+function Section({
+  id,
+  title,
+  subtitle,
+  icon: Icon,
+  children,
+}: {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
   return (
-    <section id={id} className="card-base rounded-2xl p-4 sm:p-6 overflow-hidden min-w-0 scroll-mt-20">
+    <section
+      id={id}
+      className="card-base rounded-2xl p-4 sm:p-6 overflow-hidden min-w-0 scroll-mt-20"
+    >
       <div className="flex items-start gap-2.5 mb-4">
         <div className="w-8 h-8 rounded-lg bg-accent text-accent-foreground grid place-items-center shrink-0">
           <Icon className="w-4 h-4" />
@@ -740,7 +882,15 @@ function Section({ id, title, subtitle, icon: Icon, children }: any) {
   );
 }
 
-function EmptyState({ icon: Icon, text, cta }: { icon?: any; text: string; cta?: any }) {
+function EmptyState({
+  icon: Icon,
+  text,
+  cta,
+}: {
+  icon?: LucideIcon;
+  text: string;
+  cta?: ReactNode;
+}) {
   return (
     <div className="text-center py-6 px-4 rounded-xl border border-dashed border-border">
       {Icon && (

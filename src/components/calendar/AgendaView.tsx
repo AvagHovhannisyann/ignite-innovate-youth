@@ -62,9 +62,7 @@ export function AgendaView({
       {groups.map(({ day, items }) => (
         <div key={dayKey(day)} className="card-base p-3 sm:p-4">
           <div className="flex items-baseline gap-2 mb-2">
-            <span
-              className={`font-semibold ${isToday(day) ? "text-primary" : ""}`}
-            >
+            <span className={`font-semibold ${isToday(day) ? "text-primary" : ""}`}>
               {isToday(day) ? "Այսօր" : fmtFullDate(day)}
             </span>
             {isToday(day) && (
@@ -85,7 +83,9 @@ export function AgendaView({
                       <span className="text-[11px] text-muted-foreground">Ամբողջ օր</span>
                     ) : (
                       <>
-                        <div className="text-sm font-semibold leading-tight">{fmtTime(ev.start)}</div>
+                        <div className="text-sm font-semibold leading-tight">
+                          {fmtTime(ev.start)}
+                        </div>
                         <div className="text-[11px] text-muted-foreground leading-tight">
                           {fmtTime(ev.end)}
                         </div>

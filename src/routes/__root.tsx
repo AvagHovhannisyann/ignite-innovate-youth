@@ -8,66 +8,75 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { ArrowLeft, RefreshCw, SearchX, TriangleAlert } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
+import { AuthProvider } from "@/components/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
+    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-gradient-soft px-4 py-12">
+      <div className="pointer-events-none absolute -left-28 top-12 h-64 w-64 rounded-full bg-brand-blue/15 blur-3xl" />
+      <div className="pointer-events-none absolute -right-28 bottom-12 h-64 w-64 rounded-full bg-brand-orange/15 blur-3xl" />
+      <section className="relative w-full max-w-md rounded-[2rem] border border-border bg-gradient-card p-7 text-center shadow-elegant sm:p-10">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <SearchX className="h-7 w-7" aria-hidden="true" />
         </div>
-      </div>
-    </div>
+        <p className="mt-5 text-sm font-semibold text-primary">Սխալ 404</p>
+        <h1 className="mt-2 text-3xl font-bold text-foreground">Էջը չի գտնվել</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Հնարավոր է՝ էջի հասցեն փոխվել է կամ այն այլևս հասանելի չէ։
+        </p>
+        <Link
+          to="/"
+          className="mt-7 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft transition-base hover:bg-primary/90"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Վերադառնալ գլխավոր էջ
+        </Link>
+      </section>
+    </main>
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+function ErrorComponent({ reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-gradient-soft px-4 py-12">
+      <section className="relative w-full max-w-md rounded-[2rem] border border-border bg-gradient-card p-7 text-center shadow-elegant sm:p-10">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
+          <TriangleAlert className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <h1 className="mt-5 text-3xl font-bold text-foreground">Էջը չբեռնվեց</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Ժամանակավոր խնդիր առաջացավ։ Փորձիր կրկին կամ վերադարձիր գլխավոր էջ։
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
           <button
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft transition-base hover:bg-primary/90"
           >
-            Try again
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Փորձել կրկին
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-input bg-background px-5 py-2.5 text-sm font-semibold text-foreground transition-base hover:bg-secondary"
           >
-            Go home
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Գլխավոր էջ
           </a>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
@@ -83,6 +92,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "AI-ով աշխատող երիտասարդական հարթակ Էջմիածնի երիտասարդների համար․ նախագծեր, քվեստներ, միջոցառումներ և անհատական AI օգնական։",
       },
       { name: "author", content: "Էջմիածնի Երիտասարդական Տուն" },
+      { name: "theme-color", media: "(prefers-color-scheme: light)", content: "#f9fcfd" },
+      { name: "theme-color", media: "(prefers-color-scheme: dark)", content: "#111827" },
       { property: "og:title", content: "Էջմիածնի Երիտասարդական Տուն" },
       {
         property: "og:description",
@@ -106,14 +117,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
-        crossOrigin: "anonymous",
-      },
-      {
         rel: "stylesheet",
-        // Noto Sans/Serif Armenian back up Inter/Fraunces/Fredoka, which have no Armenian glyphs.
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@600;700&family=Noto+Sans+Armenian:wght@400;500;600;700&family=Noto+Serif+Armenian:wght@500;700&display=swap",
+        // Noto Sans/Serif Armenian back up Inter/Fraunces, which have no Armenian glyphs.
+        href: "https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700&family=Noto+Serif+Armenian:wght@500;700&display=swap",
       },
     ],
     scripts: [
@@ -146,24 +152,31 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const router = useRouter();
-
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      router.invalidate();
-      queryClient.invalidateQueries();
-    });
-    return () => subscription.unsubscribe();
-  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell>
-        <Outlet />
-      </AppShell>
-      <Toaster position="top-center" />
+      <AuthProvider>
+        <AuthInvalidator />
+        <AppShell>
+          <Outlet />
+        </AppShell>
+        <Toaster position="top-center" />
+      </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+/** Refresh router/query state when Supabase rotates or replaces the session. */
+function AuthInvalidator() {
+  const { session, loading } = useAuth();
+  const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    void router.invalidate();
+    void queryClient.invalidateQueries();
+  }, [loading, queryClient, router, session?.access_token]);
+
+  return null;
 }

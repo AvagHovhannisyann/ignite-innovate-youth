@@ -9,6 +9,8 @@ export type DbQuest = {
   tint: string;
   target: number;
   xp: number;
+  requires_evidence: boolean;
+  evidence_prompt: string | null;
 };
 
 export type UserQuestRow = {
@@ -19,13 +21,18 @@ export type UserQuestRow = {
 };
 
 export function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Yerevan",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export async function fetchQuestCatalog(): Promise<DbQuest[]> {
   const { data, error } = await supabase
     .from("quest_templates")
-    .select("id,kind,title,description,icon,tint,target,xp")
+    .select("id,kind,title,description,icon,tint,target,xp,requires_evidence,evidence_prompt")
     .eq("active", true);
   if (error) throw error;
   return (data || []) as DbQuest[];
@@ -51,8 +58,8 @@ export async function fetchTodayReroll(userId: string) {
   return { used: data?.used ?? 0, seed: data?.seed ?? 1 };
 }
 
-export async function useDailyReroll() {
-  const { data, error } = await supabase.rpc("use_daily_reroll", { _max: 3 });
+export async function rerollDailyQuests() {
+  const { data, error } = await supabase.rpc("use_daily_reroll");
   if (error) throw error;
   return data as { ok: boolean; remaining: number; seed: number };
 }
@@ -66,20 +73,11 @@ export async function claimQuestXP(templateId: string, period: string) {
   return data as { already: boolean; xp: number; total_xp?: number };
 }
 
-export async function syncActivityProgress(
-  templateId: string,
-  current: number,
-  serverProgress: number,
-) {
-  const delta = Math.max(0, current - serverProgress);
-  if (delta === 0) return null;
-  const { error } = await supabase.rpc("increment_quest_progress", {
+export async function syncActivityProgress(templateId: string) {
+  const { error } = await supabase.rpc("sync_quest_progress", {
     _template_id: templateId,
-    _period: "permanent",
-    _delta: delta,
   });
   if (error) throw error;
-  return delta;
 }
 
 export async function claimLevelReward(level: number, minXP: number, reward: string) {
@@ -91,10 +89,7 @@ export async function claimLevelReward(level: number, minXP: number, reward: str
   if (error) throw error;
 }
 
-export async function fetchRewardClaims(userId: string): Promise<Set<number>> {
-  const { data } = await supabase
-    .from("reward_claims")
-    .select("level")
-    .eq("user_id", userId);
-  return new Set((data || []).map((r: any) => r.level as number));
+export async function fetchRewardClaims(userId: string): Promise<Set<string>> {
+  const { data } = await supabase.from("reward_claims").select("reward_key").eq("user_id", userId);
+  return new Set((data || []).map((r) => r.reward_key));
 }

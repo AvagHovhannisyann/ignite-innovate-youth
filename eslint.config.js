@@ -6,7 +6,19 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      ".vercel",
+      "coverage",
+      "playwright-report",
+      "test-results",
+      "supabase/.temp",
+      ".eslint-report.json",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -36,5 +48,21 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      // These Radix/shadcn primitives intentionally co-export variant helpers.
+      // They remain valid Fast Refresh boundaries in consuming component files.
+      "react-refresh/only-export-components": "off",
+    },
+  },
   eslintPluginPrettier,
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}", "src/components/feed/FeedComposer.tsx"],
+    rules: {
+      // These files intentionally export reusable component variants/helpers;
+      // that shadcn-style module shape is compatible with Fast Refresh.
+      "react-refresh/only-export-components": "off",
+    },
+  },
 );

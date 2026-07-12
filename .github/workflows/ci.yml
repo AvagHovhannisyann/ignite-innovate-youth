@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_PROJECT_ID: audit-fixture
+      SUPABASE_URL: https://audit-fixture.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: audit-publishable-key
+      VITE_SUPABASE_PROJECT_ID: audit-fixture
+      VITE_SUPABASE_URL: https://audit-fixture.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: audit-publishable-key
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm run audit:deps
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Run full UI audit
+        run: npm run test:ui
