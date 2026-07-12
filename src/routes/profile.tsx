@@ -285,7 +285,7 @@ function ProfilePage() {
                 </span>
                 <Link
                   to="/support"
-                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-card border border-border hover:bg-secondary transition-base min-h-[36px]"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-full bg-card border border-border hover:bg-secondary transition-base min-h-11"
                 >
                   <LifeBuoy className="w-3.5 h-3.5" /> Աջակցություն
                 </Link>

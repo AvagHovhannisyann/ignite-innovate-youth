@@ -734,10 +734,7 @@ function ProjectIdeaCard({ project, onOpen }: { project: ProjectIdea; onOpen: ()
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 min-w-0">
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="btn btn-secondary w-full min-w-0"
-          >
+          <button onClick={() => setOpen((v) => !v)} className="btn btn-secondary w-full min-w-0">
             {open ? "Թաքցնել մանրամասները" : "Տեսնել մանրամասները"}
           </button>
           <button

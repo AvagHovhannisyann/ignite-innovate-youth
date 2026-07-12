@@ -149,7 +149,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             title={collapsed ? n.label : undefined}
           >
             {isActive(n.to) && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary" aria-hidden />
+              <span
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary"
+                aria-hidden
+              />
             )}
             <n.icon className="w-5 h-5 shrink-0" strokeWidth={isActive(n.to) ? 2.4 : 2} />
             {(!collapsed || inDrawer) && <span className="truncate">{n.label}</span>}
