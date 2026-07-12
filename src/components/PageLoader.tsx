@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export function PageLoader({ label }: { label?: string }) {
   return (
@@ -30,7 +31,7 @@ export function EmptyState({
   description,
   action,
 }: {
-  icon: any;
+  icon: LucideIcon;
   title: string;
   description: string;
   action?: React.ReactNode;

@@ -1,9 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, streamText, tool, stepCountIs, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  safeValidateUIMessages,
+  streamText,
+  tool,
+  stepCountIs,
+  type UIMessage,
+} from "ai";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { createOpenRouterProvider, pickHealthyModel } from "@/lib/ai-gateway.server";
 import { STUDENT_AGENT_SYSTEM } from "@/lib/agent-prompts";
+import type { Json } from "@/integrations/supabase/types";
+
+const chatBodySchema = z.object({
+  messages: z.array(z.unknown()).min(1).max(100),
+  threadId: z.string().uuid(),
+});
+
+function asJson(value: unknown): Json {
+  return JSON.parse(JSON.stringify(value)) as Json;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +40,10 @@ export const Route = createFileRoute("/api/chat")({
               status: 500,
               headers: corsHeaders,
             });
+          const approvalSecret =
+            process.env.TOOL_APPROVAL_SECRET ||
+            process.env.SUPABASE_SERVICE_ROLE_KEY ||
+            openRouterKey;
           const auth = request.headers.get("authorization") || "";
           const token = auth.replace(/^Bearer\s+/i, "");
           if (!token) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
@@ -40,8 +61,51 @@ export const Route = createFileRoute("/api/chat")({
             return new Response("Unauthorized", { status: 401, headers: corsHeaders });
           const userId = userData.user.id;
 
-          const { messages, threadId }: { messages: UIMessage[]; threadId?: string } =
-            await request.json();
+          const rawBody = await request.text();
+          if (new TextEncoder().encode(rawBody).byteLength > 256_000) {
+            return new Response("Request too large", { status: 413, headers: corsHeaders });
+          }
+          let decodedBody: unknown;
+          try {
+            decodedBody = JSON.parse(rawBody);
+          } catch {
+            return new Response("Invalid JSON", { status: 400, headers: corsHeaders });
+          }
+          const body = chatBodySchema.safeParse(decodedBody);
+          if (!body.success) {
+            return new Response("Invalid request", { status: 400, headers: corsHeaders });
+          }
+          const validatedMessages = await safeValidateUIMessages<UIMessage>({
+            messages: body.data.messages,
+          });
+          if (!validatedMessages.success) {
+            return new Response("Invalid messages", { status: 400, headers: corsHeaders });
+          }
+          const messages = validatedMessages.data;
+          const { threadId } = body.data;
+
+          const { data: ownedThread, error: threadError } = await supabase
+            .from("agent_threads")
+            .select("id")
+            .eq("id", threadId)
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (threadError || !ownedThread) {
+            return new Response("Forbidden", { status: 403, headers: corsHeaders });
+          }
+
+          const { data: quota, error: quotaError } = await supabase.rpc("consume_chat_quota");
+          if (quotaError) {
+            console.error("chat quota error", quotaError);
+            return new Response("Rate limiter unavailable", { status: 503, headers: corsHeaders });
+          }
+          const quotaState = quota as Record<string, unknown> | null;
+          if (quotaState?.ok === false) {
+            return new Response("Rate limit exceeded", {
+              status: 429,
+              headers: { ...corsHeaders, "Retry-After": "3600" },
+            });
+          }
 
           // Free-tier models get overloaded unpredictably — probe for a healthy
           // one now, in parallel with the context queries below, so a single
@@ -59,7 +123,7 @@ export const Route = createFileRoute("/api/chat")({
           ] = await Promise.all([
             supabase
               .from("profiles")
-              .select("full_name,email,xp,interests,bio")
+              .select("full_name,xp,interests,skills,bio,goal,preferred_project_type,availability")
               .eq("id", userId)
               .maybeSingle(),
             supabase
@@ -128,7 +192,9 @@ export const Route = createFileRoute("/api/chat")({
               execute: async () => {
                 const { data } = await supabase
                   .from("profiles")
-                  .select("*")
+                  .select(
+                    "full_name,xp,interests,skills,bio,goal,preferred_project_type,availability",
+                  )
                   .eq("id", userId)
                   .maybeSingle();
                 return data || {};
@@ -194,8 +260,7 @@ export const Route = createFileRoute("/api/chat")({
                 const fields = Object.fromEntries(
                   Object.entries(patch).filter(([, v]) => v !== undefined),
                 );
-                if (!Object.keys(fields).length)
-                  return { ok: false, error: "no fields to update" };
+                if (!Object.keys(fields).length) return { ok: false, error: "no fields to update" };
                 const { data, error } = await supabase
                   .from("schedule_events")
                   .update(fields)
@@ -217,7 +282,8 @@ export const Route = createFileRoute("/api/chat")({
                   .from("schedule_events")
                   .delete()
                   .eq("id", id)
-                  .eq("user_id", userId);
+                  .eq("user_id", userId)
+                  .in("source", ["manual", "ai"]);
                 return error ? { ok: false, error: error.message } : { ok: true };
               },
             }),
@@ -241,23 +307,11 @@ export const Route = createFileRoute("/api/chat")({
                 urgency: z.enum(["low", "normal", "high"]).default("normal"),
               }),
               execute: async ({ subject, question, urgency }) => {
-                const { data: thread, error: e1 } = await supabase
-                  .from("support_threads")
-                  .insert({
-                    user_id: userId,
-                    subject: `[AI] ${subject}`,
-                    status: "open",
-                  })
-                  .select()
-                  .single();
-                if (e1) return { ok: false, error: e1.message };
-                const { error: e2 } = await supabase.from("support_messages").insert({
-                  thread_id: thread.id,
-                  sender_id: userId,
-                  sender_role: "user",
-                  content: `[AI agent on student's behalf, urgency: ${urgency}]\n\n${question}`,
+                const { data: thread, error: e1 } = await supabase.rpc("create_support_thread", {
+                  _subject: `[AI] ${subject}`,
+                  _first_message: `[AI օգնական, հրատապություն՝ ${urgency}]\n\n${question}`,
                 });
-                if (e2) return { ok: false, error: e2.message };
+                if (e1) return { ok: false, error: e1.message };
                 return {
                   ok: true,
                   thread_id: thread.id,
@@ -309,8 +363,7 @@ export const Route = createFileRoute("/api/chat")({
                 const fields = Object.fromEntries(
                   Object.entries(patch).filter(([, v]) => v !== undefined),
                 );
-                if (!Object.keys(fields).length)
-                  return { ok: false, error: "no fields to update" };
+                if (!Object.keys(fields).length) return { ok: false, error: "no fields to update" };
                 const { data, error } = await supabase
                   .from("profiles")
                   .update(fields)
@@ -366,21 +419,16 @@ export const Route = createFileRoute("/api/chat")({
                 "Գրանցում է ուսանողին հնարավորության մասնակից՝ opportunity ID-ով։ Ամսաթվով հնարավորությունները ավտոմատ ավելանում են օրակարգում։",
               inputSchema: z.object({ opportunity_id: z.string().uuid() }),
               execute: async ({ opportunity_id }) => {
-                const { data, error } = await supabase
-                  .from("participations")
-                  .insert({ user_id: userId, opportunity_id })
-                  .select()
-                  .single();
-                if (error) {
-                  if (error.code === "23505")
-                    return { ok: false, error: "already joined this opportunity" };
-                  return { ok: false, error: error.message };
-                }
-                return { ok: true, participation: data };
+                const { data, error } = await supabase.rpc("join_opportunity", {
+                  _opportunity_id: opportunity_id,
+                });
+                if (error) return { ok: false, error: error.message };
+                return data;
               },
             }),
             list_my_projects: tool({
-              description: "Բերում է ուսանողի բոլոր նախագծերը (ակտիվ, ուղարկված, հաստատված, մերժված, չեղարկված)՝ ID-ներով։",
+              description:
+                "Բերում է ուսանողի բոլոր նախագծերը (ակտիվ, ուղարկված, հաստատված, մերժված, չեղարկված)՝ ID-ներով։",
               inputSchema: z.object({}),
               execute: async () => {
                 const { data } = await supabase
@@ -393,7 +441,7 @@ export const Route = createFileRoute("/api/chat")({
             }),
             start_project: tool({
               description:
-                "Սկսում է նոր նախագիծ և ծախսում համապատասխան XP (easy=200, medium=400, hard=700)։ ՊԱՐՏԱԴԻՐ նախապես բացատրիր XP արժեքը և ստացիր ուսանողի հաստատումը, ապա միայն կանչիր confirmed=true-ով։",
+                "Առաջարկում է սկսել նոր նախագիծ և ծախսել համապատասխան XP (easy=200, medium=400, hard=700)։ Գործողությունը կկանգնի մինչև ուսանողը հաստատի այն UI-ում։",
               inputSchema: z.object({
                 title: z.string().min(1).max(200),
                 short_description: z.string().max(500),
@@ -402,13 +450,8 @@ export const Route = createFileRoute("/api/chat")({
                 team_size: z.string().max(100).optional(),
                 first_steps: z.array(z.string()).max(10).optional(),
                 difficulty_tier: z.enum(["easy", "medium", "hard"]),
-                confirmed: z
-                  .boolean()
-                  .describe("Must be true only after the student explicitly agreed to spend the XP"),
               }),
               execute: async (input) => {
-                if (!input.confirmed)
-                  return { ok: false, error: "not confirmed by student yet — ask first" };
                 const { data, error } = await supabase.rpc("start_project", {
                   _title: input.title,
                   _short_description: input.short_description,
@@ -435,13 +478,11 @@ export const Route = createFileRoute("/api/chat")({
             }),
             cancel_project: tool({
               description:
-                "Չեղարկում է ուսանողի նախագիծը։ ՊԱՐՏԱԴԻՐ նախապես հաստատում ստացիր ուսանողից, քանի որ սա անդառնալի է։",
+                "Առաջարկում է չեղարկել ուսանողի նախագիծը։ Գործողությունը կկանգնի մինչև ուսանողը հաստատի այն UI-ում, քանի որ այն անդառնալի է։",
               inputSchema: z.object({
                 project_id: z.string().uuid(),
-                confirmed: z.boolean(),
               }),
-              execute: async ({ project_id, confirmed }) => {
-                if (!confirmed) return { ok: false, error: "not confirmed by student yet — ask first" };
+              execute: async ({ project_id }) => {
                 const { data, error } = await supabase.rpc("cancel_project", {
                   _project_id: project_id,
                 });
@@ -489,6 +530,20 @@ export const Route = createFileRoute("/api/chat")({
             messages: await convertToModelMessages(messages),
             tools,
             stopWhen: stepCountIs(20),
+            toolApproval: {
+              add_schedule_event: "user-approval",
+              update_schedule_event: "user-approval",
+              delete_schedule_event: "user-approval",
+              ask_admin: "user-approval",
+              update_profile: "user-approval",
+              join_opportunity: "user-approval",
+              start_project: "user-approval",
+              submit_project: "user-approval",
+              cancel_project: "user-approval",
+              claim_quest: "user-approval",
+              submit_quest_evidence: "user-approval",
+            },
+            experimental_toolApprovalSecret: approvalSecret,
           });
 
           return result.toUIMessageStreamResponse({
@@ -508,36 +563,40 @@ export const Route = createFileRoute("/api/chat")({
                 if (!threadId || isAborted) return;
                 const userMsg = messages[messages.length - 1];
                 if (userMsg?.role === "user") {
-                  await supabase.from("agent_messages").insert({
-                    thread_id: threadId,
-                    role: "user",
-                    parts: userMsg.parts as any,
-                    ai_message_id: userMsg.id,
+                  const { error: userMessageError } = await supabase.rpc("save_agent_message", {
+                    _thread_id: threadId,
+                    _role: "user",
+                    _parts: asJson(userMsg.parts),
+                    _ai_message_id: userMsg.id,
                   });
+                  if (userMessageError) throw userMessageError;
                 }
                 if (responseMessage) {
-                  await supabase.from("agent_messages").insert({
-                    thread_id: threadId,
-                    role: responseMessage.role,
-                    parts: responseMessage.parts as any,
-                    ai_message_id: responseMessage.id,
-                  });
+                  const { error: assistantMessageError } = await supabase.rpc(
+                    "save_agent_message",
+                    {
+                      _thread_id: threadId,
+                      _role: responseMessage.role,
+                      _parts: asJson(responseMessage.parts),
+                      _ai_message_id: responseMessage.id,
+                    },
+                  );
+                  if (assistantMessageError) throw assistantMessageError;
                 }
-                await supabase
-                  .from("agent_threads")
-                  .update({ updated_at: new Date().toISOString() })
-                  .eq("id", threadId);
               } catch (e) {
                 console.error("agent persist failed", e);
               }
             },
           });
-        } catch (e: any) {
-          console.error("chat route error", e);
-          return new Response(JSON.stringify({ error: e?.message || "agent failure" }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+        } catch (error: unknown) {
+          console.error("chat route error", error);
+          return new Response(
+            JSON.stringify({ error: "AI օգնականը ժամանակավորապես անհասանելի է։" }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
         }
       },
     },

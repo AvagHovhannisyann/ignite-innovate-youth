@@ -63,25 +63,7 @@ export async function ensureStudentProfile(user: User) {
   if (readError) throw readError;
   if (existing) return existing;
 
-  const fullName =
-    (user.user_metadata?.full_name as string | undefined) ||
-    (user.user_metadata?.name as string | undefined) ||
-    "";
-
-  const { data: created, error: createError } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        full_name: fullName,
-        email: user.email ?? null,
-        onboarded: false,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" },
-    )
-    .select("id,onboarded")
-    .single();
+  const { data: created, error: createError } = await supabase.rpc("ensure_my_profile");
 
   if (createError) throw createError;
   return created;

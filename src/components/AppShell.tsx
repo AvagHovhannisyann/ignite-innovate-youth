@@ -6,16 +6,32 @@ import { NotificationsDropdown } from "@/components/NotificationsDropdown";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CommandCenter, CommandCenterTrigger } from "@/components/CommandCenter";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
-  LayoutDashboard, Calendar, Compass, Trophy, Newspaper, Users,
-  Sparkles, MessageCircleQuestion, Shield, ChevronLeft, ChevronRight,
-  LogOut, HelpCircle, Bell, Menu, X, MonitorDown,
+  LayoutDashboard,
+  Calendar,
+  Compass,
+  Trophy,
+  Newspaper,
+  Users,
+  Sparkles,
+  MessageCircleQuestion,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  HelpCircle,
+  Bell,
+  Menu,
+  X,
+  MonitorDown,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { usePwaInstall } from "@/hooks/use-pwa";
 import { hasSeenTour, startTour } from "@/lib/tour";
 
-type NavItem = { to: string; label: string; icon: any; adminOnly?: boolean };
+type NavItem = { to: string; label: string; icon: LucideIcon; adminOnly?: boolean };
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Վահանակ", icon: LayoutDashboard },
@@ -29,9 +45,26 @@ const NAV: NavItem[] = [
   { to: "/admin", label: "Ադմին", icon: Shield, adminOnly: true },
 ];
 
+const PAGE_TITLES: Array<{ prefix: string; label: string }> = [
+  { prefix: "/admin/quest-reviews", label: "Քվեստների ստուգում" },
+  { prefix: "/feed/create", label: "Նոր գրառում" },
+  { prefix: "/projects/", label: "Նախագիծ" },
+  { prefix: "/quest-submit", label: "Քվեստի ապացույց" },
+  { prefix: "/achievements", label: "Ձեռքբերումներ" },
+  { prefix: "/masterclasses", label: "Մաստեր-դասեր" },
+  { prefix: "/notifications", label: "Ծանուցումներ" },
+  { prefix: "/capabilities", label: "AI հնարավորություններ" },
+  { prefix: "/trending", label: "Թրենդային" },
+  ...NAV.map(({ to, label }) => ({ prefix: to, label })),
+];
+
 function PageTitle() {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const match = NAV.find((n) => path.startsWith(n.to));
+  const match = PAGE_TITLES.find(({ prefix }) =>
+    prefix.endsWith("/")
+      ? path.startsWith(prefix)
+      : path === prefix || path.startsWith(`${prefix}/`),
+  );
   // `overflow-wrap: break-word` is set on <body> (styles.css) as an app-wide
   // safety net so long Armenian words never overflow normal page content —
   // but it's an *inherited* property, so it reaches this title regardless of
@@ -46,7 +79,7 @@ function PageTitle() {
       className="text-base sm:text-lg font-semibold text-foreground truncate"
       style={{ overflowWrap: "normal" }}
     >
-      {match?.label || ""}
+      {match?.label || "Էջմիածնի Երիտասարդական Տուն"}
     </div>
   );
 }
@@ -56,7 +89,7 @@ const BARE_PREFIXES = ["/auth", "/onboarding", "/reset-password"];
 const BARE_EXACT = new Set(["/"]);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const nav = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname }) ?? "/";
   const normalizedPath = path.replace(/\/+$/, "") || "/";
@@ -65,7 +98,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     BARE_EXACT.has(normalizedPath) ||
     BARE_PREFIXES.some((p) => normalizedPath === p || normalizedPath.startsWith(p + "/"));
 
-  const [isAdmin, setIsAdmin] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { canInstall, install } = usePwaInstall();
@@ -78,23 +110,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [user, isBare, normalizedPath]);
 
   useEffect(() => {
-    if (!user || isBare) { setIsAdmin(false); return; }
-    supabase.from("user_roles").select("role").eq("user_id", user.id).then(({ data }) => {
-      setIsAdmin(!!data?.some((r) => r.role === "admin"));
-    });
-  }, [user, isBare]);
-
-  useEffect(() => { setMobileOpen(false); }, [path]);
+    setMobileOpen(false);
+  }, [path]);
 
   // unauthenticated, or on a full-bleed route: bare layout, no shell
   if (!user || isBare) return <>{children}</>;
 
   const items = NAV.filter((n) => !n.adminOnly || isAdmin);
-  const isActive = (to: string) => path === to || (to !== "/dashboard" && path.startsWith(to));
+  const isActive = (to: string) =>
+    path === to || (to !== "/dashboard" && path.startsWith(`${to}/`));
 
   const SidebarBody = ({ inDrawer = false }: { inDrawer?: boolean }) => (
     <>
-      <div className={`flex items-center gap-2 px-4 h-16 border-b border-border ${collapsed && !inDrawer ? "justify-center px-2" : ""}`}>
+      <div
+        className={`flex items-center gap-2 px-4 h-16 border-b border-border ${collapsed && !inDrawer ? "justify-center px-2" : ""}`}
+      >
         <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
           <img src={logo} alt="" className="w-9 h-9 object-contain shrink-0" />
           {(!collapsed || inDrawer) && (
@@ -111,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             key={n.to}
             to={n.to}
             data-tour={`nav-${n.to.slice(1)}`}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
               isActive(n.to)
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -125,8 +155,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
       <div className="border-t border-border p-2">
         <button
-          onClick={async () => { await supabase.auth.signOut(); nav({ to: "/" }); }}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors ${collapsed && !inDrawer ? "justify-center" : ""}`}
+          onClick={async () => {
+            await supabase.auth.signOut();
+            nav({ to: "/" });
+          }}
+          className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 ${collapsed && !inDrawer ? "justify-center" : ""}`}
           title="Դուրս գալ"
         >
           <LogOut className="w-5 h-5 shrink-0" />
@@ -145,54 +178,67 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarBody />
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-background border border-border grid place-items-center shadow-sm hover:bg-secondary"
+          className="absolute -right-[22px] top-20 grid h-11 w-11 place-items-center rounded-full border border-border bg-background shadow-sm hover:bg-secondary"
           aria-label={collapsed ? "Բացել" : "Փակել"}
         >
-          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          {collapsed ? (
+            <ChevronRight className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronLeft className="w-3.5 h-3.5" />
+          )}
         </button>
       </aside>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-background flex flex-col md:hidden animate-slide-in-left">
-            <SidebarBody inDrawer />
-          </aside>
-        </>
-      )}
+      {/* Mobile drawer — Radix provides focus trapping, Escape handling and
+          screen-reader dialog semantics that the old custom overlay lacked. */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="w-72 p-0 flex flex-col md:hidden">
+          <SheetTitle className="sr-only">Հիմնական մենյու</SheetTitle>
+          <SidebarBody inDrawer />
+        </SheetContent>
+      </Sheet>
 
-      <div className={`flex flex-col min-w-0 transition-[padding] duration-200 ${collapsed ? "md:pl-[72px]" : "md:pl-64"}`}>
+      <div
+        className={`flex flex-col min-w-0 transition-[padding] duration-200 ${collapsed ? "md:pl-[72px]" : "md:pl-64"}`}
+      >
         <header className="sticky top-0 z-30 h-14 sm:h-16 bg-background/85 backdrop-blur-md border-b border-border flex items-center gap-2 px-3 sm:px-6">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="md:hidden p-2 rounded-lg hover:bg-secondary"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg hover:bg-secondary md:hidden"
             aria-label="Բացել մենյուն"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex-1 min-w-0"><PageTitle /></div>
+          <div className="flex-1 min-w-0">
+            <PageTitle />
+          </div>
           {canInstall && (
             <button
               type="button"
               data-tour="install-app"
               onClick={() => void install()}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/15 transition-colors"
+              className="hidden min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 sm:inline-flex"
             >
               <MonitorDown className="w-3.5 h-3.5" /> Տեղադրել
             </button>
           )}
-          <span data-tour="command-center" className="inline-flex"><CommandCenterTrigger /></span>
+          <span data-tour="command-center" className="inline-flex shrink-0">
+            <CommandCenterTrigger />
+          </span>
           <ThemeToggle />
-          <Link to="/support" className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full hover:bg-secondary" aria-label="Օգնություն">
+          <Link
+            to="/support"
+            className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-secondary sm:inline-flex"
+            aria-label="Օգնություն"
+          >
             <HelpCircle className="w-5 h-5 text-muted-foreground" />
           </Link>
           <NotificationsDropdown />
           <Link
             to="/profile"
             aria-label="Իմ էջը"
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gradient-hero text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-hero text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
             {(user.email || "U").slice(0, 1).toUpperCase()}
           </Link>

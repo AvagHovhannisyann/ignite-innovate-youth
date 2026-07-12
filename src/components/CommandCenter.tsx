@@ -2,7 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { applyTheme } from "@/components/ThemeToggle";
+import { applyTheme } from "@/lib/theme";
+import { startTour } from "@/lib/tour";
 import {
   CommandDialog,
   CommandEmpty,
@@ -29,6 +30,11 @@ import {
   Monitor,
   LogOut,
   Search,
+  Award,
+  GraduationCap,
+  Flame,
+  Bell,
+  Wrench,
 } from "lucide-react";
 
 const PAGES = [
@@ -41,6 +47,11 @@ const PAGES = [
   { to: "/agent", label: "AI Օգնական", icon: Sparkles },
   { to: "/support", label: "Աջակցություն", icon: MessageCircleQuestion },
   { to: "/profile", label: "Իմ էջը", icon: User },
+  { to: "/achievements", label: "Ձեռքբերումներ", icon: Award },
+  { to: "/masterclasses", label: "Մաստեր-դասեր", icon: GraduationCap },
+  { to: "/trending", label: "Թրենդային", icon: Flame },
+  { to: "/notifications", label: "Ծանուցումներ", icon: Bell },
+  { to: "/capabilities", label: "AI հնարավորություններ", icon: Wrench },
 ];
 
 type DynamicItem = { id: string; title: string; to: string; params?: Record<string, string> };
@@ -53,6 +64,7 @@ export function CommandCenter() {
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<DynamicItem[]>([]);
   const [opps, setOpps] = useState<DynamicItem[]>([]);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const { user } = useAuth();
   const nav = useNavigate();
 
@@ -69,12 +81,14 @@ export function CommandCenter() {
 
   // Load searchable data lazily, on first open.
   useEffect(() => {
-    if (!open || !user || projects.length || opps.length) return;
+    if (!open || !user || loadedFor === user.id) return;
+    let cancelled = false;
     (async () => {
       const [{ data: sp }, { data: op }] = await Promise.all([
         supabase.from("started_projects").select("id,title").eq("user_id", user.id).limit(20),
         supabase.from("opportunities").select("id,title").limit(20),
       ]);
+      if (cancelled) return;
       setProjects(
         (sp || []).map((p) => ({
           id: p.id,
@@ -84,8 +98,19 @@ export function CommandCenter() {
         })),
       );
       setOpps((op || []).map((o) => ({ id: o.id, title: o.title, to: "/opportunities" })));
+      setLoadedFor(user.id);
     })();
-  }, [open, user, projects.length, opps.length]);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadedFor, open, user]);
+
+  useEffect(() => {
+    if (user?.id === loadedFor || loadedFor === null) return;
+    setProjects([]);
+    setOpps([]);
+    setLoadedFor(null);
+  }, [loadedFor, user?.id]);
 
   const run = useCallback((fn: () => void) => {
     setOpen(false);
@@ -129,7 +154,7 @@ export function CommandCenter() {
             onSelect={() =>
               run(() => {
                 nav({ to: "/dashboard" });
-                setTimeout(() => import("@/lib/tour").then((m) => m.startTour()), 600);
+                setTimeout(startTour, 600);
               })
             }
           >

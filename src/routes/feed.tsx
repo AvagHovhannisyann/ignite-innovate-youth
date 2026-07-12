@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { PostCard, StatusBadge } from "@/components/PostCard";
-import { FeedComposer, dailyPrompt } from "@/components/feed/FeedComposer";
+import { FeedComposer } from "@/components/feed/FeedComposer";
+import { dailyPrompt } from "@/lib/feed-prompts";
 import { fetchApprovedFeed, fetchMyPending, type Post } from "@/lib/feed";
 import { levelFromXP } from "@/lib/constants";
 import { Newspaper, Flame, Trophy, MessageCircleHeart, Lightbulb } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/feed")({ component: Feed });
 
@@ -32,7 +34,10 @@ function Feed() {
   const nav = useNavigate();
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [mine, setMine] = useState<Post[]>([]);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Pick<
+    Tables<"profiles">,
+    "full_name" | "email" | "xp"
+  > | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [prefill, setPrefill] = useState<string | null>(null);
 
@@ -182,7 +187,9 @@ function Feed() {
                 {tag ? `#${tag} թեգով գրառումներ չկան։` : "Ֆիդը դեռ դատարկ է։"}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {tag ? "Փորձիր այլ թեգ կամ գրիր առաջինը։" : "Հենց դու կարող ես սկսել խոսակցությունը։"}
+                {tag
+                  ? "Փորձիր այլ թեգ կամ գրիր առաջինը։"
+                  : "Հենց դու կարող ես սկսել խոսակցությունը։"}
               </p>
               {!tag && (
                 <div className="flex flex-wrap justify-center gap-2">

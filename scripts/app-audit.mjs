@@ -3,23 +3,126 @@
  *
  * Injects a fake auth session and intercepts every Supabase REST/auth call
  * with fixtures, so authenticated routes render real layouts without a live
- * database. Visits every route at phone / tablet / desktop widths and reports:
+ * database. Visits every UI route/state across phone, tablet, and desktop
+ * profiles (including dark and reduced-motion profiles) and reports:
  *   - uncaught console errors and page crashes
  *   - horizontal overflow (document wider than viewport)
- *   - tap targets smaller than 40x40 on touch widths
+ *   - interactive targets smaller than 44x44 on touch widths
+ *   - unexpected redirects and local resource failures
  *
- * Usage: node scripts/app-audit.mjs [baseUrl] [shotDir]
+ * By default the audit starts and stops its own Vite server. Pass --base-url
+ * to audit an already-running server instead.
+ *
+ * Usage: node scripts/app-audit.mjs [--base-url URL] [--shots DIR]
  */
 import { chromium } from "playwright-core";
-import { mkdirSync, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:net";
 
-const BASE = process.argv[2] || "http://127.0.0.1:5173";
-const SHOTS = process.argv[3] || "";
-// Keep the stub aligned with the project the app actually targets.
-const REF = /SUPABASE_PROJECT_ID="?([a-z0-9]+)"?/.exec(
-  readFileSync(new URL("../.env", import.meta.url), "utf8"),
-)?.[1];
-if (!REF) throw new Error("Could not read SUPABASE_PROJECT_ID from .env");
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const MIN_TOUCH_TARGET = 44;
+
+async function availableLoopbackPort() {
+  return new Promise((resolvePort, reject) => {
+    const reservation = createServer();
+    reservation.unref();
+    reservation.once("error", reject);
+    reservation.listen(0, "127.0.0.1", () => {
+      const address = reservation.address();
+      if (!address || typeof address === "string") {
+        reservation.close();
+        reject(new Error("Could not allocate a loopback port for the UI audit"));
+        return;
+      }
+      const { port } = address;
+      reservation.close((error) => (error ? reject(error) : resolvePort(port)));
+    });
+  });
+}
+
+function printUsage() {
+  console.log(
+    `Usage: node scripts/app-audit.mjs [options]\n\nOptions:\n  --base-url URL   Audit an existing server instead of starting Vite\n  --shots DIR      Write a full-page screenshot for every render\n  --help            Show this help\n\nEnvironment equivalents:\n  APP_AUDIT_BASE_URL, APP_AUDIT_SHOTS, APP_AUDIT_CHROMIUM`,
+  );
+}
+
+function parseArgs(argv) {
+  const values = [];
+  let baseUrl = process.env.APP_AUDIT_BASE_URL || "";
+  let shots = process.env.APP_AUDIT_SHOTS || "";
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--help" || arg === "-h") {
+      printUsage();
+      process.exit(0);
+    }
+    if (arg === "--base-url") {
+      baseUrl = argv[++index] || "";
+      if (!baseUrl) throw new Error("--base-url requires a URL");
+      continue;
+    }
+    if (arg === "--shots") {
+      shots = argv[++index] || "";
+      if (!shots) throw new Error("--shots requires a directory");
+      continue;
+    }
+    if (arg.startsWith("--")) throw new Error(`Unknown option: ${arg}`);
+    values.push(arg);
+  }
+
+  // Preserve the original positional interface: [baseUrl] [shotDir].
+  if (values[0]) baseUrl ||= values[0];
+  if (values[1]) shots ||= values[1];
+  if (values.length > 2) throw new Error("Too many positional arguments");
+  return { baseUrl, shots };
+}
+
+const cli = parseArgs(process.argv.slice(2));
+const DEFAULT_BASE = `http://127.0.0.1:${cli.baseUrl ? 5173 : await availableLoopbackPort()}`;
+const BASE = (cli.baseUrl || DEFAULT_BASE).replace(/\/$/, "");
+const BASE_ORIGIN = new URL(BASE).origin;
+const SHOTS = cli.shots ? resolve(ROOT, cli.shots) : "";
+const SHOULD_START_SERVER = !cli.baseUrl;
+
+function readProjectEnv() {
+  try {
+    return readFileSync(resolve(ROOT, ".env"), "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function envFileValue(source, key) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escaped}=["']?([^"'\\r\\n]+)["']?`, "m").exec(source)?.[1];
+}
+
+// Keep the network stub aligned with the Supabase host used by the app. CI
+// can provide environment variables directly; local runs may use .env.
+const projectEnv = readProjectEnv();
+const supabaseUrl =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  envFileValue(projectEnv, "VITE_SUPABASE_URL") ||
+  envFileValue(projectEnv, "SUPABASE_URL");
+const REF =
+  process.env.SUPABASE_PROJECT_ID ||
+  process.env.VITE_SUPABASE_PROJECT_ID ||
+  envFileValue(projectEnv, "SUPABASE_PROJECT_ID") ||
+  envFileValue(projectEnv, "VITE_SUPABASE_PROJECT_ID") ||
+  (supabaseUrl ? new URL(supabaseUrl).hostname.split(".")[0] : "") ||
+  "audit-fixture";
+const AUDIT_SUPABASE_URL = supabaseUrl || `https://${REF}.supabase.co`;
+const AUDIT_SUPABASE_KEY =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  envFileValue(projectEnv, "VITE_SUPABASE_PUBLISHABLE_KEY") ||
+  envFileValue(projectEnv, "SUPABASE_PUBLISHABLE_KEY") ||
+  "audit-publishable-key";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const user = {
@@ -363,10 +466,11 @@ const session = {
   user,
 };
 
-function restResponse(url, headers) {
+function restResponse(url, headers, scenario) {
   const table = url.pathname.replace(/^\/rest\/v1\//, "").split("?")[0];
   if (table.startsWith("rpc/")) return { status: 200, body: JSON.stringify(null) };
-  let rows = TABLES[table] ?? [];
+  let rows =
+    table === "profiles" && scenario.profile ? [scenario.profile] : [...(TABLES[table] ?? [])];
   const accept = headers["accept"] || "";
   const preferObject = accept.includes("vnd.pgrst.object");
   // crude eq filters so per-id lookups behave
@@ -385,14 +489,42 @@ function restResponse(url, headers) {
   return { status: 200, body: JSON.stringify(rows) };
 }
 
-async function stubBackend(context) {
-  // External hosts (fonts, CDNs) are unreachable in CI sandboxes and only
-  // slow the run down — kill them fast so page "load" settles quickly.
+async function stubBackend(context, scenario, profileConfig) {
+  // Keep Supabase Realtime deterministic without suppressing WebSocket
+  // errors. The fake socket stays open for the short lifetime of the page.
+  await context.routeWebSocket(`**/${REF}.supabase.co/realtime/v1/**`, (socket) => {
+    socket.onMessage(() => {});
+  });
+
+  // External fonts/CDNs are irrelevant to this structural audit and may be
+  // unavailable in CI. Return successful empty resources instead of aborting
+  // them (which would create console noise indistinguishable from app errors).
   await context.route("**/*", (route) => {
-    const host = new URL(route.request().url()).hostname;
-    if (host === "127.0.0.1" || host === "localhost" || host.endsWith(`${REF}.supabase.co`))
+    const url = new URL(route.request().url());
+    const host = url.hostname;
+    if (
+      url.origin === BASE_ORIGIN ||
+      host === "127.0.0.1" ||
+      host === "localhost" ||
+      host === `${REF}.supabase.co`
+    ) {
       return route.fallback();
-    return route.abort();
+    }
+    const extension = url.pathname.split(".").pop()?.toLowerCase();
+    const contentType =
+      extension === "css"
+        ? "text/css"
+        : extension === "js" || extension === "mjs"
+          ? "application/javascript"
+          : "text/plain";
+    return route.fulfill({
+      status: 200,
+      body: "",
+      headers: {
+        "content-type": contentType,
+        "access-control-allow-origin": "*",
+      },
+    });
   });
   await context.route(`**/${REF}.supabase.co/**`, async (route) => {
     const req = route.request();
@@ -414,125 +546,366 @@ async function stubBackend(context) {
           "access-control-allow-methods": "*",
         },
       });
-    if (url.pathname.startsWith("/auth/v1/user")) return json(200, JSON.stringify(user));
-    if (url.pathname.startsWith("/auth/v1/token")) return json(200, JSON.stringify(session));
+    if (url.pathname.startsWith("/auth/v1/user")) {
+      return scenario.authenticated
+        ? json(200, JSON.stringify(user))
+        : json(401, JSON.stringify({ message: "Auth session missing" }));
+    }
+    if (url.pathname.startsWith("/auth/v1/token")) {
+      return scenario.authenticated
+        ? json(200, JSON.stringify(session))
+        : json(400, JSON.stringify({ error: "invalid_grant" }));
+    }
     if (url.pathname.startsWith("/auth/v1/logout")) return json(204, "");
     if (url.pathname.startsWith("/auth/v1/")) return json(200, JSON.stringify({}));
     if (url.pathname.startsWith("/storage/")) return json(200, JSON.stringify({ signedUrls: [] }));
     if (url.pathname.startsWith("/functions/"))
       return json(200, JSON.stringify({ result: null, aiUsed: false }));
     if (url.pathname.startsWith("/rest/v1/")) {
+      if (url.pathname.endsWith("/rpc/ensure_agent_thread")) {
+        return json(200, JSON.stringify(TABLES.agent_threads[0]));
+      }
+      if (url.pathname.endsWith("/rpc/reset_agent_thread")) {
+        return json(200, JSON.stringify(TABLES.agent_threads[0]));
+      }
+      if (url.pathname.endsWith("/rpc/save_agent_message")) {
+        return json(200, JSON.stringify(TABLES.agent_messages[0]));
+      }
       if (req.method() !== "GET" && req.method() !== "HEAD") {
         const preferObject = (headers["accept"] || "").includes("vnd.pgrst.object");
         const body = preferObject ? "{}" : "[]";
         return json(201, body);
       }
-      const { status, body } = restResponse(url, headers);
+      const { status, body } = restResponse(url, headers, scenario);
       return json(status, body);
     }
     return json(200, "{}");
   });
   await context.addInitScript(
-    ([ref, sess]) => {
-      window.localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(sess));
+    ({ ref, sess, authenticated, theme }) => {
+      if (authenticated) {
+        window.localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(sess));
+      } else {
+        window.localStorage.removeItem(`sb-${ref}-auth-token`);
+      }
+      window.localStorage.setItem("theme", theme);
     },
-    [REF, session],
+    {
+      ref: REF,
+      sess: session,
+      authenticated: scenario.authenticated,
+      theme: profileConfig.theme,
+    },
   );
 }
 
-const ROUTES = [
-  "/",
-  "/auth",
-  "/dashboard",
-  "/schedule",
-  "/opportunities",
-  "/quests",
-  "/feed",
-  "/community",
-  "/agent",
-  "/support",
-  "/profile",
-  "/achievements",
-  "/masterclasses",
-  "/trending",
-  "/notifications",
-  "/capabilities",
-  "/admin",
-  "/admin/quest-reviews",
-  "/feed/create",
-  "/projects/22222222-2222-4222-8222-222222222222",
+const signedIn = { authenticated: true, profile };
+const signedOut = { authenticated: false, profile };
+const incompleteProfile = { ...profile, onboarded: false, interests: [], skills: [] };
+
+/**
+ * Explicit cases make auth/search/redirect state part of route coverage.
+ * `source` is checked against src/routes so a newly-added UI route cannot be
+ * silently omitted from the harness.
+ */
+const ROUTE_CASES = [
+  { id: "landing-public", source: "index.tsx", path: "/", ...signedOut },
+  { id: "landing-signed-in", source: "index.tsx", path: "/", ...signedIn },
+  { id: "auth-sign-in", source: "auth.tsx", path: "/auth?mode=signin", ...signedOut },
+  { id: "auth-sign-up", source: "auth.tsx", path: "/auth?mode=signup", ...signedOut },
+  { id: "auth-forgot", source: "auth.tsx", path: "/auth?mode=forgot", ...signedOut },
+  {
+    id: "auth-callback-error",
+    source: "auth.callback.tsx",
+    path: "/auth/callback?error=access_denied&error_description=Audit%20fixture",
+    settleMs: 300,
+    ...signedOut,
+  },
+  {
+    id: "reset-password-invalid-link",
+    source: "reset-password.tsx",
+    path: "/reset-password",
+    ...signedOut,
+  },
+  {
+    id: "reset-password-recovery",
+    source: "reset-password.tsx",
+    path: "/reset-password",
+    ...signedIn,
+  },
+  {
+    id: "onboarding-incomplete-profile",
+    source: "onboarding.tsx",
+    path: "/onboarding",
+    authenticated: true,
+    profile: incompleteProfile,
+  },
+  { id: "dashboard", source: "dashboard.tsx", path: "/dashboard", ...signedIn },
+  { id: "schedule", source: "schedule.tsx", path: "/schedule", ...signedIn },
+  {
+    id: "opportunities-public",
+    source: "opportunities.tsx",
+    path: "/opportunities",
+    ...signedOut,
+  },
+  {
+    id: "opportunities-signed-in",
+    source: "opportunities.tsx",
+    path: "/opportunities",
+    ...signedIn,
+  },
+  { id: "quests", source: "quests.tsx", path: "/quests", ...signedIn },
+  {
+    id: "quest-evidence-submit",
+    source: "quest-submit.tsx",
+    path: "/quest-submit?template_id=e-photo",
+    ...signedIn,
+  },
+  { id: "feed", source: "feed.tsx", path: "/feed", ...signedIn },
+  { id: "feed-create", source: "feed.create.tsx", path: "/feed/create", ...signedIn },
+  { id: "community", source: "community.tsx", path: "/community", ...signedIn },
+  { id: "agent", source: "agent.tsx", path: "/agent", ...signedIn },
+  {
+    id: "assistant-legacy-redirect",
+    source: "assistant.tsx",
+    path: "/assistant",
+    expectedPath: "/agent",
+    ...signedIn,
+  },
+  { id: "support", source: "support.tsx", path: "/support", ...signedIn },
+  { id: "profile", source: "profile.tsx", path: "/profile", ...signedIn },
+  {
+    id: "achievements",
+    source: "achievements.tsx",
+    path: "/achievements",
+    ...signedIn,
+  },
+  {
+    id: "masterclasses",
+    source: "masterclasses.tsx",
+    path: "/masterclasses",
+    ...signedIn,
+  },
+  { id: "trending", source: "trending.tsx", path: "/trending", ...signedIn },
+  {
+    id: "notifications",
+    source: "notifications.tsx",
+    path: "/notifications",
+    ...signedIn,
+  },
+  {
+    id: "capabilities-public",
+    source: "capabilities.tsx",
+    path: "/capabilities",
+    ...signedOut,
+  },
+  { id: "admin", source: "admin.tsx", path: "/admin", ...signedIn },
+  {
+    id: "admin-quest-reviews",
+    source: "admin.quest-reviews.tsx",
+    path: "/admin/quest-reviews",
+    ...signedIn,
+  },
+  {
+    id: "project-detail",
+    source: "projects.$id.tsx",
+    path: "/projects/22222222-2222-4222-8222-222222222222",
+    ...signedIn,
+  },
+  {
+    id: "not-found",
+    source: "__root.tsx",
+    path: "/audit-not-found",
+    expectedStatus: 404,
+    ...signedOut,
+  },
 ];
 
-const VIEWPORTS = [
-  { name: "phone", width: 390, height: 844, touch: true },
-  { name: "phone-sm", width: 360, height: 780, touch: true },
-  { name: "desktop", width: 1440, height: 900, touch: false },
+function assertUiRouteCoverage() {
+  const routeDir = resolve(ROOT, "src/routes");
+  const uiRouteFiles = readdirSync(routeDir)
+    .filter((name) => name.endsWith(".tsx"))
+    .sort();
+  const covered = new Set(ROUTE_CASES.map((scenario) => scenario.source));
+  const missing = uiRouteFiles.filter((name) => !covered.has(name));
+  if (missing.length) {
+    throw new Error(`UI route coverage is incomplete. Add audit cases for: ${missing.join(", ")}`);
+  }
+}
+
+assertUiRouteCoverage();
+
+const PROFILES = [
+  {
+    name: "phone-sm-light",
+    width: 360,
+    height: 780,
+    touch: true,
+    theme: "light",
+    reducedMotion: "no-preference",
+  },
+  {
+    name: "phone-dark",
+    width: 390,
+    height: 844,
+    touch: true,
+    theme: "dark",
+    reducedMotion: "no-preference",
+  },
+  {
+    name: "tablet-dark-reduced",
+    width: 768,
+    height: 1024,
+    touch: true,
+    theme: "dark",
+    reducedMotion: "reduce",
+  },
+  {
+    name: "desktop-light",
+    width: 1440,
+    height: 900,
+    touch: false,
+    theme: "light",
+    reducedMotion: "no-preference",
+  },
 ];
 
-const IGNORED_ERRORS = [
-  /Failed to load resource/i, // stubbed/blocked network noise
-  /net::ERR/i,
-  /fonts\.googleapis/i,
-  /hydrat/i, // React hydration warnings surface separately if fatal
-  /WebSocket connection .* failed/i, // realtime WS can't be intercepted by the stub
-];
-
-async function auditRoute(context, route, vp, findings) {
+async function auditRoute(context, scenario, profileConfig, findings) {
   const page = await context.newPage();
   const errors = [];
   page.on("console", (msg) => {
-    if (msg.type() === "error" && !IGNORED_ERRORS.some((re) => re.test(msg.text())))
-      errors.push(msg.text());
+    if (msg.type() !== "error") return;
+    if (
+      scenario.expectedStatus === 404 &&
+      msg.text().startsWith("Failed to load resource: the server responded with a status of 404")
+    ) {
+      return;
+    }
+    errors.push(msg.text());
   });
   page.on("pageerror", (err) => errors.push(`PAGEERROR: ${err.message}`));
-  try {
-    await page.goto(BASE + route, { waitUntil: "load", timeout: 20000 }).catch(() => {});
-    await page.waitForTimeout(1500);
-    await page.waitForLoadState("load", { timeout: 5000 }).catch(() => {});
-
-    const metrics = await page.evaluate((touch) => {
-      const doc = document.documentElement;
-      if (!doc || !document.body)
-        return { overflowX: 0, offenders: [], smallTargets: [], path: "CRASHED", crashed: true };
-      const overflowX = Math.max(
-        doc.scrollWidth - doc.clientWidth,
-        document.body.scrollWidth - doc.clientWidth,
+  page.on("requestfailed", (request) => {
+    const url = new URL(request.url());
+    if (url.origin === BASE_ORIGIN) {
+      errors.push(
+        `LOCAL REQUEST FAILED: ${request.method()} ${url.pathname} (${request.failure()?.errorText || "unknown"})`,
       );
-      const offenders = [];
-      if (overflowX > 1) {
-        for (const el of document.querySelectorAll("body *")) {
-          const r = el.getBoundingClientRect();
-          if (r.right > doc.clientWidth + 1 && r.width > 8 && el.children.length < 8) {
-            offenders.push(
-              `${el.tagName.toLowerCase()}.${String(el.className).split(" ").slice(0, 3).join(".")} right=${Math.round(r.right)}`,
+    }
+  });
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    const requestedPath = new URL(BASE + scenario.path).pathname;
+    const isExpectedNavigationError =
+      response.request().isNavigationRequest() &&
+      url.pathname === requestedPath &&
+      response.status() === scenario.expectedStatus;
+    if (url.origin === BASE_ORIGIN && response.status() >= 400 && !isExpectedNavigationError) {
+      errors.push(`LOCAL RESPONSE ${response.status()}: ${url.pathname}`);
+    }
+  });
+  try {
+    const response = await page.goto(BASE + scenario.path, {
+      waitUntil: "load",
+      timeout: 30000,
+    });
+    if (!response) throw new Error("navigation returned no response");
+    const expectedStatus = scenario.expectedStatus ?? 200;
+    if (response.status() !== expectedStatus) {
+      errors.push(`NAVIGATION STATUS ${response.status()} (expected ${expectedStatus})`);
+    }
+    await page.waitForTimeout(scenario.settleMs ?? 800);
+
+    let metrics = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        metrics = await page.evaluate(
+          ({ touch, minTarget }) => {
+            const doc = document.documentElement;
+            if (!doc || !document.body)
+              return {
+                overflowX: 0,
+                offenders: [],
+                smallTargets: [],
+                path: "CRASHED",
+                crashed: true,
+              };
+            const overflowX = Math.max(
+              doc.scrollWidth - doc.clientWidth,
+              document.body.scrollWidth - doc.clientWidth,
             );
-            if (offenders.length >= 5) break;
-          }
-        }
+            const offenders = [];
+            if (overflowX > 1) {
+              for (const el of document.querySelectorAll("body *")) {
+                const r = el.getBoundingClientRect();
+                if (r.right > doc.clientWidth + 1 && r.width > 8 && el.children.length < 8) {
+                  offenders.push(
+                    `${el.tagName.toLowerCase()}.${String(el.className).split(" ").slice(0, 3).join(".")} right=${Math.round(r.right)}`,
+                  );
+                  if (offenders.length >= 5) break;
+                }
+              }
+            }
+            const smallTargets = [];
+            if (touch) {
+              const selector =
+                'a[href],button:not([disabled]),input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[role="button"]:not([aria-disabled="true"])';
+              for (const el of document.querySelectorAll(selector)) {
+                let target = el;
+                if (el instanceof HTMLInputElement && ["checkbox", "radio"].includes(el.type)) {
+                  target =
+                    el.closest("label") ||
+                    (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null) ||
+                    el;
+                }
+                const r = target.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) continue; // hidden
+                const style = getComputedStyle(target);
+                if (
+                  style.visibility === "hidden" ||
+                  style.display === "none" ||
+                  style.pointerEvents === "none"
+                ) {
+                  continue;
+                }
+                if (r.height < minTarget - 0.5 || r.width < minTarget - 0.5) {
+                  const label = (el.getAttribute("aria-label") || el.textContent || "")
+                    .trim()
+                    .slice(0, 30);
+                  const identity = `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}`;
+                  smallTargets.push(
+                    `${Math.round(r.width)}x${Math.round(r.height)} ${identity} "${label}"`,
+                  );
+                  if (smallTargets.length >= 12) break;
+                }
+              }
+            }
+            return {
+              overflowX,
+              offenders,
+              smallTargets,
+              path: location.pathname,
+              crashed: false,
+              dark: doc.classList.contains("dark"),
+              reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+              viteError: Boolean(document.querySelector("vite-error-overlay")),
+            };
+          },
+          { touch: profileConfig.touch, minTarget: MIN_TOUCH_TARGET },
+        );
+        break;
+      } catch (error) {
+        const transientNavigation = String(error).includes("Execution context was destroyed");
+        if (!transientNavigation || attempt === 1) throw error;
+        await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
+        await page.waitForTimeout(250);
       }
-      const smallTargets = [];
-      if (touch) {
-        for (const el of document.querySelectorAll("a,button,[role=button]")) {
-          const r = el.getBoundingClientRect();
-          if (r.width === 0 || r.height === 0) continue; // hidden
-          const style = getComputedStyle(el);
-          if (style.visibility === "hidden" || style.display === "none") continue;
-          if ((r.height < 36 || r.width < 36) && el.closest("[cmdk-root]") == null) {
-            const label = (el.getAttribute("aria-label") || el.textContent || "")
-              .trim()
-              .slice(0, 30);
-            smallTargets.push(`${Math.round(r.width)}x${Math.round(r.height)} "${label}"`);
-            if (smallTargets.length >= 8) break;
-          }
-        }
-      }
-      return { overflowX, offenders, smallTargets, path: location.pathname };
-    }, vp.touch);
+    }
+    if (!metrics) throw new Error("page metrics were unavailable after navigation settled");
 
     if (SHOTS) {
       await page
         .screenshot({
-          path: `${SHOTS}/${vp.name}${route.replace(/[/$]/g, "_") || "_home"}.png`,
+          path: `${SHOTS}/${profileConfig.name}__${scenario.id}.png`,
           fullPage: true,
         })
         .catch(() => {});
@@ -540,20 +913,31 @@ async function auditRoute(context, route, vp, findings) {
 
     const issues = [];
     if (metrics.crashed) issues.push("page did not render (no document.body)");
-    // Signed-in users are expected to be bounced from /auth to the dashboard.
-    const expectedRedirect = route === "/auth" && metrics.path === "/dashboard";
-    if (metrics.path !== route && !(route === "/" && metrics.path === "/") && !expectedRedirect)
+    if (metrics.viteError) issues.push("Vite error overlay rendered");
+    const expectedPath = scenario.expectedPath || new URL(BASE + scenario.path).pathname;
+    if (metrics.path !== expectedPath) {
       issues.push(`redirected to ${metrics.path}`);
+    }
+    if (metrics.dark !== (profileConfig.theme === "dark")) {
+      issues.push(`expected ${profileConfig.theme} theme but document.dark=${metrics.dark}`);
+    }
+    if (metrics.reducedMotion !== (profileConfig.reducedMotion === "reduce")) {
+      issues.push(
+        `expected reducedMotion=${profileConfig.reducedMotion} but media query=${metrics.reducedMotion}`,
+      );
+    }
     if (errors.length) issues.push(...errors.map((e) => `console: ${e.slice(0, 220)}`));
     if (metrics.overflowX > 1)
       issues.push(`overflow-x ${metrics.overflowX}px [${metrics.offenders.join(" | ")}]`);
     if (metrics.smallTargets.length)
       issues.push(`small tap targets: ${metrics.smallTargets.join(", ")}`);
-    if (issues.length) findings.push({ route, vp: vp.name, issues });
+    if (issues.length) {
+      findings.push({ scenario: scenario.id, profile: profileConfig.name, issues });
+    }
   } catch (e) {
     findings.push({
-      route,
-      vp: vp.name,
+      scenario: scenario.id,
+      profile: profileConfig.name,
       issues: [`audit error: ${String(e.message || e).slice(0, 160)}`],
     });
   } finally {
@@ -561,39 +945,208 @@ async function auditRoute(context, route, vp, findings) {
   }
 }
 
-// This sandbox requires ALL outbound traffic through a pre-configured agent
-// proxy (HTTPS_PROXY) — Chromium doesn't pick that up on its own, so without
-// an explicit proxy option it can't reach any real destination (local dev
-// server or live internet) and every navigation fails. Route through the
-// proxy for real hosts; bypass it for loopback, since the proxy doesn't
-// forward to the sandbox's own dev server.
-const upstreamProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
-  proxy: upstreamProxy ? { server: upstreamProxy, bypass: "127.0.0.1,localhost" } : undefined,
-});
-if (SHOTS) mkdirSync(SHOTS, { recursive: true });
-const findings = [];
-for (const vp of VIEWPORTS) {
-  const context = await browser.newContext({
-    viewport: { width: vp.width, height: vp.height },
-    hasTouch: vp.touch,
-    isMobile: vp.touch,
-    deviceScaleFactor: vp.touch ? 2 : 1,
-  });
-  await stubBackend(context);
-  for (const route of ROUTES) await auditRoute(context, route, vp, findings);
-  await context.close();
-}
-await browser.close();
-
-if (!findings.length) {
-  console.log("AUDIT CLEAN: no console errors, overflow, or tap-target issues found.");
-} else {
-  console.log(`AUDIT FINDINGS (${findings.length}):`);
-  for (const f of findings) {
-    console.log(`\n[${f.vp}] ${f.route}`);
-    for (const i of f.issues) console.log(`  - ${i}`);
+function executable(path) {
+  if (!path) return false;
+  try {
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  process.exitCode = 1;
+}
+
+function commandPath(command) {
+  const locator = process.platform === "win32" ? "where" : "which";
+  const result = spawnSync(locator, [command], { encoding: "utf8" });
+  if (result.status !== 0) return "";
+  return result.stdout.split(/\r?\n/).find(Boolean)?.trim() || "";
+}
+
+function playwrightCacheCandidates() {
+  const cacheRoot =
+    process.env.PLAYWRIGHT_BROWSERS_PATH && process.env.PLAYWRIGHT_BROWSERS_PATH !== "0"
+      ? process.env.PLAYWRIGHT_BROWSERS_PATH
+      : resolve(homedir(), ".cache/ms-playwright");
+  if (!existsSync(cacheRoot)) return [];
+  const candidates = [];
+  for (const entry of readdirSync(cacheRoot)) {
+    if (!entry.startsWith("chromium")) continue;
+    const root = resolve(cacheRoot, entry);
+    candidates.push(
+      resolve(root, "chrome-linux64/chrome"),
+      resolve(root, "chrome-linux/chrome"),
+      resolve(root, "chrome-headless-shell-linux64/chrome-headless-shell"),
+      resolve(root, "chrome-linux/headless_shell"),
+    );
+  }
+  return candidates;
+}
+
+function resolveChromiumExecutable() {
+  const configured =
+    process.env.APP_AUDIT_CHROMIUM ||
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+    process.env.CHROME_PATH;
+  if (configured && !executable(configured)) {
+    throw new Error(`Configured Chromium executable is not usable: ${configured}`);
+  }
+
+  const commands = [
+    "chromium",
+    "chromium-browser",
+    "google-chrome",
+    "google-chrome-stable",
+    "chrome",
+    "msedge",
+  ];
+  const candidates = [
+    configured,
+    chromium.executablePath(),
+    ...playwrightCacheCandidates(),
+    ...commands.map(commandPath),
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    resolve(process.env.LOCALAPPDATA || "", "Google/Chrome/Application/chrome.exe"),
+  ];
+  return candidates.find(executable) || "";
+}
+
+function formatServerOutput(chunks) {
+  return chunks.join("").trim().split(/\r?\n/).slice(-30).join("\n");
+}
+
+async function startViteServer() {
+  const base = new URL(BASE);
+  if (!["127.0.0.1", "localhost"].includes(base.hostname) || base.protocol !== "http:") {
+    throw new Error(
+      `The automatic server only supports a local HTTP URL (received ${BASE}). Use --base-url for an external server.`,
+    );
+  }
+
+  const viteEntry = resolve(ROOT, "node_modules/vite/bin/vite.js");
+  if (!existsSync(viteEntry)) {
+    throw new Error("Vite is not installed. Run `npm ci` before the UI audit.");
+  }
+  const output = [];
+  const server = spawn(
+    process.execPath,
+    [viteEntry, "dev", "--host", base.hostname, "--port", base.port || "80", "--strictPort"],
+    {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        SUPABASE_PROJECT_ID: REF,
+        SUPABASE_URL: AUDIT_SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY: AUDIT_SUPABASE_KEY,
+        VITE_SUPABASE_PROJECT_ID: REF,
+        VITE_SUPABASE_URL: AUDIT_SUPABASE_URL,
+        VITE_SUPABASE_PUBLISHABLE_KEY: AUDIT_SUPABASE_KEY,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  const collect = (chunk) => {
+    output.push(String(chunk));
+    if (output.length > 100) output.shift();
+  };
+  server.stdout.on("data", collect);
+  server.stderr.on("data", collect);
+
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (server.exitCode !== null) {
+      throw new Error(
+        `Vite exited before the audit started (code ${server.exitCode}).\n${formatServerOutput(output)}`,
+      );
+    }
+    try {
+      const response = await fetch(BASE, { signal: AbortSignal.timeout(1_000) });
+      if (response.ok) {
+        console.log(`Audit server ready at ${BASE}`);
+        return server;
+      }
+    } catch {
+      // Server is still starting.
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+  }
+
+  server.kill("SIGTERM");
+  throw new Error(`Timed out waiting for Vite at ${BASE}.\n${formatServerOutput(output)}`);
+}
+
+async function stopServer(server) {
+  if (!server || server.exitCode !== null) return;
+  server.kill("SIGTERM");
+  await Promise.race([
+    new Promise((resolveExit) => server.once("exit", resolveExit)),
+    new Promise((resolveDelay) => setTimeout(resolveDelay, 3_000)),
+  ]);
+  if (server.exitCode === null) server.kill("SIGKILL");
+}
+
+let server;
+let browser;
+try {
+  if (SHOULD_START_SERVER) server = await startViteServer();
+
+  const executablePath = resolveChromiumExecutable();
+  if (!executablePath) {
+    throw new Error(
+      "Chromium was not found. Run `npm run test:ui:install`, or set APP_AUDIT_CHROMIUM to an executable path.",
+    );
+  }
+  console.log(`Using Chromium: ${executablePath}`);
+
+  // Some sandboxes require outbound traffic through HTTPS_PROXY. External
+  // resources are stubbed, but retain proxy support for an explicit remote
+  // --base-url while always bypassing the local audit server.
+  const upstreamProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
+  browser = await chromium.launch({
+    executablePath,
+    proxy: upstreamProxy
+      ? { server: upstreamProxy, bypass: "127.0.0.1,localhost,<loopback>" }
+      : undefined,
+  });
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+
+  const findings = [];
+  for (const profileConfig of PROFILES) {
+    for (const scenario of ROUTE_CASES) {
+      // A fresh context is intentional: auth storage, theme, service workers,
+      // and route handlers must not leak between state cases.
+      const context = await browser.newContext({
+        viewport: { width: profileConfig.width, height: profileConfig.height },
+        hasTouch: profileConfig.touch,
+        isMobile: profileConfig.touch,
+        deviceScaleFactor: profileConfig.touch ? 2 : 1,
+        colorScheme: profileConfig.theme,
+        reducedMotion: profileConfig.reducedMotion,
+        serviceWorkers: "block",
+      });
+      await stubBackend(context, scenario, profileConfig);
+      await auditRoute(context, scenario, profileConfig, findings);
+      await context.close();
+    }
+  }
+
+  const renders = ROUTE_CASES.length * PROFILES.length;
+  if (!findings.length) {
+    console.log(
+      `AUDIT CLEAN: ${ROUTE_CASES.length} route/state cases × ${PROFILES.length} profiles = ${renders} renders; no console, resource, redirect, theme, overflow, or ${MIN_TOUCH_TARGET}px target failures.`,
+    );
+  } else {
+    console.log(`AUDIT FINDINGS (${findings.length} of ${renders} renders):`);
+    for (const finding of findings) {
+      console.log(`\n[${finding.profile}] ${finding.scenario}`);
+      for (const issue of finding.issues) console.log(`  - ${issue}`);
+    }
+    process.exitCode = 1;
+  }
+} finally {
+  await browser?.close().catch(() => {});
+  await stopServer(server);
 }

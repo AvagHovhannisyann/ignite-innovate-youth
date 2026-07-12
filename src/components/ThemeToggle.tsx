@@ -1,22 +1,6 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
-
-type Theme = "light" | "dark" | "system";
-
-function readTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  const t = localStorage.getItem("theme");
-  return t === "light" || t === "dark" ? t : "system";
-}
-
-export function applyTheme(theme: Theme) {
-  const dark =
-    theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
-  if (theme === "system") localStorage.removeItem("theme");
-  else localStorage.setItem("theme", theme);
-}
+import { applyTheme, readTheme, THEME_CHANGE_EVENT, type Theme } from "@/lib/theme";
 
 const ORDER: Theme[] = ["light", "dark", "system"];
 const META: Record<Theme, { icon: typeof Sun; label: string }> = {
@@ -35,8 +19,15 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     const onChange = () => {
       if (readTheme() === "system") applyTheme("system");
     };
+    const onThemeChange = (event: Event) => {
+      setTheme((event as CustomEvent<Theme>).detail);
+    };
     mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    return () => {
+      mq.removeEventListener("change", onChange);
+      window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    };
   }, []);
 
   const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
@@ -46,12 +37,11 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={() => {
-        setTheme(next);
         applyTheme(next);
       }}
       aria-label={`${label} — սեղմիր փոխելու համար`}
       title={label}
-      className={`inline-flex items-center justify-center w-9 h-9 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${className}`}
+      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground ${className}`}
     >
       <Icon className="w-5 h-5" />
     </button>

@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { CalendarCheck, Copy, Check, ExternalLink, QrCode } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarDays,
+  Calendar,
+  Mail,
+  Copy,
+  Check,
+  ExternalLink,
+  QrCode,
+} from "lucide-react";
 
 /**
  * One-click calendar subscription. The ICS feed is read-only and keeps the
@@ -18,7 +27,9 @@ export function SubscribeMenu({ httpsUrl }: { httpsUrl: string }) {
   useEffect(() => {
     if (!showQr || qr || !httpsUrl) return;
     import("qrcode").then((QR) =>
-      QR.toDataURL(webcal, { width: 220, margin: 1 }).then(setQr).catch(() => {}),
+      QR.toDataURL(webcal, { width: 220, margin: 1 })
+        .then(setQr)
+        .catch(() => {}),
     );
   }, [showQr, qr, webcal, httpsUrl]);
 
@@ -34,7 +45,7 @@ export function SubscribeMenu({ httpsUrl }: { httpsUrl: string }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-lg bg-secondary hover:bg-secondary/70 text-sm">
+        <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-secondary px-3 text-sm hover:bg-secondary/70">
           <CalendarCheck className="w-4 h-4" />
           <span className="hidden sm:inline">Բաժանորդագրվել</span>
         </button>
@@ -44,24 +55,28 @@ export function SubscribeMenu({ httpsUrl }: { httpsUrl: string }) {
           Համաժամեցրու քո օրացույցի հավելվածի հետ (միակողմանի, ավտոմատ թարմացվող)։
         </div>
         <a href={google} target="_blank" rel="noopener noreferrer" className={item}>
-          <span className="text-base">📅</span> Google Calendar
+          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" /> Google Calendar
           <ExternalLink className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
         </a>
         <a href={webcal} className={item}>
-          <span className="text-base"></span> Apple Calendar
+          <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" /> Apple Calendar
           <ExternalLink className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
         </a>
         <a href={outlook} target="_blank" rel="noopener noreferrer" className={item}>
-          <span className="text-base">📧</span> Outlook
+          <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> Outlook
           <ExternalLink className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
         </a>
         <button
           className={item}
-          onClick={() => {
-            navigator.clipboard.writeText(httpsUrl);
-            setCopied(true);
-            toast.success("Հղումը պատճենվեց");
-            setTimeout(() => setCopied(false), 2000);
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(httpsUrl);
+              setCopied(true);
+              toast.success("Հղումը պատճենվեց");
+              setTimeout(() => setCopied(false), 2000);
+            } catch {
+              toast.error("Հղումը չհաջողվեց պատճենել");
+            }
           }}
         >
           {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}

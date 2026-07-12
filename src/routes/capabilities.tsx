@@ -1,122 +1,271 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  ArrowRight,
+  Check,
+  LockKeyhole,
+  MessageSquare,
+  Palette,
+  ShieldCheck,
+  Sparkles,
+  WandSparkles,
+  Wrench,
+  Zap,
+} from "lucide-react";
+
 import { AGENT_CAPABILITIES } from "@/lib/agent-prompts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Wrench, Palette, Shield, MessageSquare } from "lucide-react";
 
 export const Route = createFileRoute("/capabilities")({
   head: () => ({
     meta: [
       { title: "AI մենթորի հնարավորությունները — EYH" },
-      { name: "description", content: "Ի՞նչ կարող է անել քո անհատական AI մենթորը՝ հմտություններ, գործիքներ, ոճ և անվտանգություն։" },
+      {
+        name: "description",
+        content:
+          "Ի՞նչ կարող է անել քո անհատական AI մենթորը՝ հմտություններ, գործիքներ, ոճ և անվտանգություն։",
+      },
     ],
   }),
   component: CapabilitiesPage,
 });
 
+const EXAMPLE_QUESTIONS = [
+  "Կազմիր ինձ ուսման պլան մաթեմատիկայի օլիմպիադայի համար՝ 6 շաբաթով։",
+  "Ի՞նչ նախագիծ կառաջարկես իմ XP-ի մակարդակին։",
+  "Ավելացրու իմ օրակարգում վաղը՝ 18։00-ին, անգլերենի պարապմունք։",
+  "Ի՞նչ քվեսթեր ունեմ այս շաբաթ, և ի՞նչ ապացույց է պետք։",
+  "Հարցրու ադմինին՝ կարո՞ղ եմ ուշանալ վաղվա հանդիպումից։",
+  "Ո՞ր հնարավորությունները կհամապատասխանեն ինձ ծրագրավորման ուղղությամբ։",
+] as const;
+
 function CapabilitiesPage() {
   return (
-    <div className="p-3 sm:p-6 pb-24 md:pb-6 max-w-5xl mx-auto space-y-8 min-w-0 overflow-x-hidden">
-        <header className="space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-            <Sparkles className="w-3.5 h-3.5" /> EYH Mentor
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Քո AI մենթորի հնարավորությունները</h1>
-          <p className="text-muted-foreground max-w-2xl">
-            Ամեն ուսանող ունի անհատական AI մենթոր՝ EYH Mentor։ Ստորև՝ ինչ կարող է անել, ինչ գործիքների է տիրապետում, ինչպես է խոսում քեզ հետ, և ինչ սահմաններ ունի։
-          </p>
-          <div className="flex gap-2 pt-2">
-            <Button asChild>
-              <Link to="/agent"><MessageSquare className="w-4 h-4 mr-2" /> Բացել AI մենթորը</Link>
+    <main className="min-h-dvh bg-gradient-soft">
+      <div className="mx-auto max-w-6xl space-y-12 px-4 pb-28 pt-5 sm:px-6 sm:pt-8 md:pb-12">
+        <header className="relative overflow-hidden rounded-[2rem] border border-border bg-gradient-card p-6 shadow-elegant sm:p-9 lg:p-12">
+          <div
+            className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-blue/15 blur-3xl"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-brand-orange/15 blur-3xl"
+            aria-hidden="true"
+          />
+
+          <div className="relative max-w-3xl">
+            <div className="chip inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              EYH Mentor
+            </div>
+            <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-5xl">
+              Մենթոր, որը ոչ միայն պատասխանում է, այլև օգնում է գործել
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              Քո անհատական AI մենթորը հասկանում է նպատակներդ, օգնում է պլանավորել և կարող է անվտանգ
+              գործիքներով աշխատանք կատարել հենց քո հաշվում։ Վերջնական որոշումը միշտ քոնն է։
+            </p>
+            <Button asChild size="lg" className="mt-7 min-h-11 rounded-xl px-5 shadow-soft">
+              <Link to="/agent">
+                <MessageSquare className="h-4 w-4" aria-hidden="true" />
+                Բացել AI մենթորը
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </Button>
           </div>
+
+          <dl className="relative mt-9 grid grid-cols-3 gap-2 border-t border-border pt-6 sm:max-w-xl sm:gap-4">
+            <CapabilityStat value={AGENT_CAPABILITIES.skills.length} label="ուղղություն" />
+            <CapabilityStat value={AGENT_CAPABILITIES.tools.length} label="գործիք" />
+            <CapabilityStat value={AGENT_CAPABILITIES.styles.length} label="խոսքի ոճ" />
+          </dl>
         </header>
 
-        <Section icon={<Sparkles className="w-5 h-5" />} title="Հմտություններ" subtitle="9 հիմնական ուղղություն, որոնցով կարող ես օգտվել">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {AGENT_CAPABILITIES.skills.map((s) => (
-              <Card key={s.id} className="hover:border-primary/40 transition-colors">
-                <CardHeader className="pb-2"><CardTitle className="text-base">{s.title}</CardTitle></CardHeader>
-                <CardContent className="text-sm text-muted-foreground">{s.desc}</CardContent>
-              </Card>
+        <Section
+          id="mentor-skills"
+          eyebrow="Ինչով կարող է օգնել"
+          icon={<WandSparkles className="h-5 w-5" />}
+          title="Հմտություններ"
+          subtitle="Մեծ նպատակից մինչև հստակ հաջորդ քայլ՝ մենթորը հարմարեցնում է օգնությունը քո իրավիճակին։"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="list">
+            {AGENT_CAPABILITIES.skills.map((skill, index) => (
+              <article key={skill.id} className="card-interactive group p-5" role="listitem">
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary tabular-nums">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <Sparkles
+                    className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary"
+                    aria-hidden="true"
+                  />
+                </div>
+                <h3 className="text-base font-semibold leading-6 text-foreground">{skill.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{skill.desc}</p>
+              </article>
             ))}
           </div>
         </Section>
 
-        <Section icon={<Wrench className="w-5 h-5" />} title="Գործիքներ" subtitle="Իրական ակցիաներ, որ AI-ն կարող է կատարել քո հաշվում">
-          <div className="grid sm:grid-cols-2 gap-3">
-            {AGENT_CAPABILITIES.tools.map((t) => (
-              <Card key={t.id}>
-                <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
-                  <CardTitle className="text-base">{t.title}</CardTitle>
-                  <Badge variant={t.autonomy === "auto" ? "secondary" : "default"} className="text-[10px]">
-                    {t.autonomy === "auto" ? "ինքնավար" : "հաստատումով"}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground space-y-1">
-                  <div>{t.desc}</div>
-                  <code className="text-[11px] text-muted-foreground/70">{t.id}</code>
-                </CardContent>
-              </Card>
-            ))}
+        <Section
+          id="mentor-tools"
+          eyebrow="Գործողություններ հաշվում"
+          icon={<Wrench className="h-5 w-5" />}
+          title="Գործիքներ"
+          subtitle="Մենթորը կարող է աշխատել քո օրակարգի, նախագծերի, քվեսթների և հնարավորությունների հետ։"
+        >
+          <div className="grid gap-3 sm:grid-cols-2" role="list">
+            {AGENT_CAPABILITIES.tools.map((tool) => {
+              const needsConfirmation = tool.autonomy !== "auto";
+              return (
+                <article
+                  key={tool.id}
+                  className="card-base flex items-start gap-4 p-5"
+                  role="listitem"
+                >
+                  <div
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                      needsConfirmation ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"
+                    }`}
+                  >
+                    {needsConfirmation ? (
+                      <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+                    ) : (
+                      <Zap className="h-5 w-5" aria-hidden="true" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="font-semibold leading-6 text-foreground">{tool.title}</h3>
+                      <Badge
+                        variant={needsConfirmation ? "default" : "secondary"}
+                        className="chip rounded-full px-2.5 py-1 text-[11px]"
+                      >
+                        {needsConfirmation ? "Քո հաստատումով" : "Ինքնավար"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{tool.desc}</p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            «Ինքնավար» գործիքները AI-ն օգտագործում է առանց հաստատման։ XP ծախսել, գրառում հրապարակել, նախագիծ ուղարկել — այս գործողությունները միշտ պահանջում են քո «այո»-ն։
-          </p>
-        </Section>
-
-        <Section icon={<Palette className="w-5 h-5" />} title="Հաղորդակցման ոճեր" subtitle="AI-ն ադապտացվում է քեզ">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {AGENT_CAPABILITIES.styles.map((s) => (
-              <Card key={s.id}>
-                <CardHeader className="pb-2"><CardTitle className="text-base">{s.title}</CardTitle></CardHeader>
-                <CardContent className="text-sm text-muted-foreground">{s.desc}</CardContent>
-              </Card>
-            ))}
-          </div>
-        </Section>
-
-        <Section icon={<Shield className="w-5 h-5" />} title="Անվտանգություն և սահմաններ" subtitle="Ինչ AI-ն չի անի՝ քո ու մյուսների պաշտպանության համար">
-          <Card>
-            <CardContent className="pt-6">
-              <ul className="space-y-2 text-sm">
-                {AGENT_CAPABILITIES.safety.map((line, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-primary mt-0.5">•</span><span>{line}</span></li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </Section>
-
-        <Section icon={<MessageSquare className="w-5 h-5" />} title="Օրինակ հարցեր" subtitle="Ինչպես սկսել">
-          <div className="grid sm:grid-cols-2 gap-2">
-            {[
-              "Կազմիր ինձ ուսման պլան մաթեմատիկայի օլիմպիադայի համար, 6 շաբաթ։",
-              "Ի՞նչ նախագիծ առաջարկում ես իմ XP-ի մակարդակին։",
-              "Ավելացրու իմ օրակարգում վաղը 18։00 — անգլերենի պարապմունք։",
-              "Ի՞նչ քվեսթեր ունեմ այս շաբաթ և ի՞նչ ապացույց է պետք։",
-              "Հարցրու ադմինին՝ կարո՞ղ եմ արդյոք ուշանալ վաղվա հանդիպումից։",
-              "Ո՞ր հնարավորությունները կհամապատասխանեն ինձ՝ ծրագրավորման ուղղությամբ։",
-            ].map((q, i) => (
-              <Card key={i} className="hover:border-primary/40 transition-colors">
-                <CardContent className="pt-4 pb-4 text-sm">"{q}"</CardContent>
-              </Card>
-            ))}
+          <div className="mt-4 flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <p>
+              «Քո հաստատումով» նշված գործողությունները կատարվում են միայն այն բանից հետո, երբ դու
+              հստակ համաձայնություն ես տալիս։
+            </p>
           </div>
         </Section>
+
+        <Section
+          id="mentor-styles"
+          eyebrow="Քեզ հարմար լեզվով"
+          icon={<Palette className="h-5 w-5" />}
+          title="Հաղորդակցման ոճեր"
+          subtitle="Կարճ պատասխան, մանրամասն բացատրություն կամ քայլ առ քայլ ուղեցույց՝ ըստ քո կարիքի։"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="list">
+            {AGENT_CAPABILITIES.styles.map((style) => (
+              <article key={style.id} className="bento-tile p-5" role="listitem">
+                <h3 className="font-semibold text-foreground">{style.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{style.desc}</p>
+              </article>
+            ))}
+          </div>
+        </Section>
+
+        <Section
+          id="mentor-safety"
+          eyebrow="Վստահելի օգտագործում"
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="Անվտանգություն և սահմաններ"
+          subtitle="Հստակ սահմաններ՝ քո տվյալները, ընտրությունը և բարեկեցությունը պաշտպանելու համար։"
+        >
+          <div className="rounded-[1.5rem] border border-border bg-gradient-card p-5 shadow-soft sm:p-7">
+            <ul className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+              {AGENT_CAPABILITIES.safety.map((line) => (
+                <li key={line} className="flex items-start gap-3 text-sm leading-6">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-success/10 text-success">
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Section>
+
+        <Section
+          id="mentor-examples"
+          eyebrow="Սկսելու համար"
+          icon={<MessageSquare className="h-5 w-5" />}
+          title="Օրինակ հարցեր"
+          subtitle="Կարող ես գրել բնական լեզվով․ հատուկ հրահանգներ կամ հրամաններ պետք չեն։"
+        >
+          <div className="grid gap-3 sm:grid-cols-2" role="list">
+            {EXAMPLE_QUESTIONS.map((question) => (
+              <article
+                key={question}
+                className="card-interactive flex items-start gap-3 p-5 text-sm leading-6"
+                role="listitem"
+              >
+                <MessageSquare
+                  className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <p>«{question}»</p>
+              </article>
+            ))}
+          </div>
+        </Section>
+      </div>
+    </main>
+  );
+}
+
+function CapabilityStat({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-xl font-bold text-foreground tabular-nums sm:text-2xl">{value}</dd>
     </div>
   );
 }
 
-function Section({ icon, title, subtitle, children }: { icon: React.ReactNode; title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({
+  id,
+  eyebrow,
+  icon,
+  title,
+  subtitle,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
+    <section className="space-y-5" aria-labelledby={id}>
+      <div className="flex items-start gap-3">
+        <div
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"
+          aria-hidden="true"
+        >
+          {icon}
+        </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            {eyebrow}
+          </p>
+          <h2 id={id} className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+            {title}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       {children}

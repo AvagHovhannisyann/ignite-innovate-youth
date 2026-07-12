@@ -4,20 +4,29 @@ export const Route = createFileRoute("/api/public/ics/$token")({
   server: {
     handlers: {
       GET: async ({ params }) => {
-        const raw = (params as any).token || "";
+        const raw = params.token || "";
         const token = raw.replace(/\.ics$/i, "");
         if (!/^[0-9a-f-]{36}$/i.test(token)) return new Response("invalid", { status: 400 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: profile } = await supabaseAdmin
-          .from("profiles").select("id,full_name").eq("ics_token", token).maybeSingle();
+          .from("profiles")
+          .select("id,full_name")
+          .eq("ics_token", token)
+          .maybeSingle();
         if (!profile) return new Response("not found", { status: 404 });
 
         const { data: events } = await supabaseAdmin
-          .from("schedule_events").select("*").eq("user_id", profile.id).order("starts_at");
+          .from("schedule_events")
+          .select("*")
+          .eq("user_id", profile.id)
+          .order("starts_at");
 
         function fmtUtc(d: string) {
-          return new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+          return new Date(d)
+            .toISOString()
+            .replace(/[-:]/g, "")
+            .replace(/\.\d{3}/, "");
         }
         function fmtDate(d: string) {
           return new Date(d).toISOString().slice(0, 10).replace(/-/g, "");
@@ -50,15 +59,17 @@ export const Route = createFileRoute("/api/public/ics/$token")({
           "PRODID:-//Ejmiatsin Youth House//Schedule//EN",
           "CALSCALE:GREGORIAN",
           "METHOD:PUBLISH",
-          `X-WR-CALNAME:${esc(profile.full_name || "My Schedule")}`,
+          `X-WR-CALNAME:${esc(profile.full_name || "Իմ օրակարգը")}`,
           "X-WR-TIMEZONE:Asia/Yerevan",
           "X-PUBLISHED-TTL:PT30M",
           "REFRESH-INTERVAL;VALUE=DURATION:PT30M",
         ];
         for (const e of events || []) {
-          lines.push("BEGIN:VEVENT",
+          lines.push(
+            "BEGIN:VEVENT",
             `UID:${e.id}@eyh`,
-            `DTSTAMP:${fmtUtc(e.updated_at || e.created_at || new Date().toISOString())}`);
+            `DTSTAMP:${fmtUtc(e.updated_at || e.created_at || new Date().toISOString())}`,
+          );
           if (e.all_day) {
             lines.push(
               `DTSTART;VALUE=DATE:${fmtDate(e.starts_at)}`,
@@ -70,8 +81,7 @@ export const Route = createFileRoute("/api/public/ics/$token")({
           lines.push(`SUMMARY:${esc(e.title)}`);
           if (e.description) lines.push(`DESCRIPTION:${esc(e.description)}`);
           if (e.location) lines.push(`LOCATION:${esc(e.location)}`);
-          // Column arrives with the calendar migration; absent until then.
-          const remind = Number((e as Record<string, unknown>).reminder_minutes);
+          const remind = Number(e.reminder_minutes);
           if (Number.isFinite(remind) && remind > 0) {
             lines.push(
               "BEGIN:VALARM",
@@ -88,7 +98,10 @@ export const Route = createFileRoute("/api/public/ics/$token")({
         return new Response(lines.map(fold).join("\r\n") + "\r\n", {
           headers: {
             "Content-Type": "text/calendar; charset=utf-8",
-            "Cache-Control": "public, max-age=300",
+            // The URL contains a per-user secret. Never allow shared caches to
+            // retain the personal calendar response.
+            "Cache-Control": "private, max-age=300, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
           },
         });
       },

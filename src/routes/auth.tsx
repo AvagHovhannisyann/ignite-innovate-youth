@@ -5,6 +5,7 @@ import { getAuthCallbackUrl, getPostAuthDestination, waitForVerifiedUser } from 
 import { Navbar } from "@/components/Navbar";
 import { AuthShowcase } from "@/components/AuthShowcase";
 import { Sparkles, Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react";
+import { getErrorMessage } from "@/lib/utils";
 
 type Mode = "signin" | "signup" | "forgot";
 
@@ -146,8 +147,8 @@ function AuthPage() {
         }
         setInfo("Եթե այս էլ. հասցեով հաշիվ գոյություն ունի, վերականգնման հղումն ուղարկված է։");
       }
-    } catch (err: any) {
-      setError(friendlyError(err?.message));
+    } catch (error: unknown) {
+      setError(friendlyError(getErrorMessage(error, "")));
     } finally {
       setLoading(false);
     }
@@ -172,8 +173,8 @@ function AuthPage() {
         return;
       }
       // The browser is being redirected to Google; keep the spinner running.
-    } catch (err: any) {
-      setError(friendlyError(err?.message));
+    } catch (error: unknown) {
+      setError(friendlyError(getErrorMessage(error, "")));
       setLoading(false);
     }
   }
@@ -258,10 +259,14 @@ function AuthPage() {
           >
             {isSignup && (
               <div>
-                <label className="block text-sm font-medium mb-1.5">Անուն Ազգանուն</label>
+                <label htmlFor="auth-full-name" className="block text-sm font-medium mb-1.5">
+                  Անուն Ազգանուն
+                </label>
                 <input
+                  id="auth-full-name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  maxLength={120}
                   required
                   autoComplete="name"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-input bg-background outline-none focus:ring-2 focus:ring-ring"
@@ -269,8 +274,11 @@ function AuthPage() {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium mb-1.5">Էլ. հասցե</label>
+              <label htmlFor="auth-email" className="block text-sm font-medium mb-1.5">
+                Էլ. հասցե
+              </label>
               <input
+                id="auth-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -282,12 +290,14 @@ function AuthPage() {
             {!isForgot && (
               <div>
                 <div className="flex flex-col min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between gap-1 mb-1.5">
-                  <label className="block text-sm font-medium">Գաղտնաբառ</label>
+                  <label htmlFor="auth-password" className="block text-sm font-medium">
+                    Գաղտնաբառ
+                  </label>
                   {!isSignup && (
                     <button
                       type="button"
                       onClick={() => switchMode("forgot")}
-                      className="text-xs text-primary hover:underline text-left min-w-0 break-words"
+                      className="inline-flex min-h-11 min-w-0 items-center px-2 text-left text-xs text-primary hover:underline"
                     >
                       Մոռացե՞լ ես գաղտնաբառը
                     </button>
@@ -295,6 +305,7 @@ function AuthPage() {
                 </div>
                 <div className="relative">
                   <input
+                    id="auth-password"
                     type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -323,12 +334,18 @@ function AuthPage() {
             )}
 
             {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-2.5 rounded-lg break-words">
+              <div
+                role="alert"
+                className="text-sm text-destructive bg-destructive/10 p-2.5 rounded-lg break-words"
+              >
                 {error}
               </div>
             )}
             {info && (
-              <div className="text-sm text-foreground bg-primary/10 p-2.5 rounded-lg flex gap-2 items-start">
+              <div
+                role="status"
+                className="text-sm text-foreground bg-primary/10 p-2.5 rounded-lg flex gap-2 items-start"
+              >
                 <CheckCircle2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                 <span className="break-words min-w-0">{info}</span>
               </div>
@@ -355,7 +372,7 @@ function AuthPage() {
                 Հիշեցի՞ր։{" "}
                 <button
                   onClick={() => switchMode("signin")}
-                  className="text-primary font-medium hover:underline"
+                  className="inline-flex min-h-11 items-center px-2 font-medium text-primary hover:underline"
                 >
                   Վերադառնալ մուտքի էջ
                 </button>
@@ -365,7 +382,7 @@ function AuthPage() {
                 Արդեն անդա՞մ ես։{" "}
                 <button
                   onClick={() => switchMode("signin")}
-                  className="text-primary font-medium hover:underline"
+                  className="inline-flex min-h-11 items-center px-2 font-medium text-primary hover:underline"
                 >
                   Մուտք
                 </button>
@@ -375,7 +392,7 @@ function AuthPage() {
                 Նո՞ր ես այստեղ։{" "}
                 <button
                   onClick={() => switchMode("signup")}
-                  className="text-primary font-medium hover:underline"
+                  className="inline-flex min-h-11 items-center px-2 font-medium text-primary hover:underline"
                 >
                   Ստեղծել հաշիվ
                 </button>
@@ -408,7 +425,12 @@ function PasswordStrength({ password }: { password: string }) {
   const level = Math.min(3, Math.floor((score / 5) * 4)); // 0..3
   const LABEL = ["Թույլ", "Միջին", "Լավ", "Ուժեղ"];
   const COLOR = ["bg-destructive", "bg-amber-500", "bg-lime-500", "bg-success"];
-  const TEXT = ["text-destructive", "text-amber-600 dark:text-amber-400", "text-lime-600 dark:text-lime-400", "text-success"];
+  const TEXT = [
+    "text-destructive",
+    "text-amber-600 dark:text-amber-400",
+    "text-lime-600 dark:text-lime-400",
+    "text-success",
+  ];
   return (
     <div className="mt-1.5">
       <div className="flex gap-1">

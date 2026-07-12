@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
@@ -9,7 +9,7 @@ import {
   fetchQuestCatalog,
   fetchUserQuests,
   fetchTodayReroll,
-  useDailyReroll,
+  rerollDailyQuests,
   claimQuestXP,
   syncActivityProgress,
   claimLevelReward,
@@ -37,9 +37,13 @@ import {
   Flame,
   Gift,
   Zap,
+  Upload,
+  type LucideIcon,
 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { getErrorMessage } from "@/lib/utils";
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   Compass,
   Rocket,
   Lightbulb,
@@ -59,20 +63,25 @@ type Quest = {
   type: "activity" | "daily";
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   progress: number;
   target: number;
   xp: number;
   period: string;
   awarded: boolean;
+  requiresEvidence: boolean;
+  submissionStatus?: "pending" | "approved" | "rejected";
 };
 
 function pickDaily(catalog: DbQuest[], seed: number, count = 2): DbQuest[] {
   const daily = catalog.filter((q) => q.kind === "daily");
+  const seededHash = (id: string) => {
+    let hash = seed || 1;
+    for (let i = 0; i < id.length; i += 1) hash = Math.imul(hash ^ id.charCodeAt(i), 16_777_619);
+    return hash >>> 0;
+  };
   const sorted = [...daily].sort((a, b) => {
-    const ha = Math.sin((a.id.charCodeAt(0) + seed) * 9301);
-    const hb = Math.sin((b.id.charCodeAt(0) + seed) * 9301);
-    return ha - hb;
+    return seededHash(a.id) - seededHash(b.id);
   });
   return sorted.slice(0, count);
 }
@@ -123,64 +132,86 @@ function buildRoad(): Node[] {
 function QuestsPage() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
   const [catalog, setCatalog] = useState<DbQuest[]>([]);
   const [userQuests, setUserQuests] = useState<UserQuestRow[]>([]);
   const [reroll, setReroll] = useState({ seed: 1, used: 0 });
-  const [claims, setClaims] = useState<Set<number>>(new Set());
+  const [claims, setClaims] = useState<Set<string>>(new Set());
+  const [submissions, setSubmissions] = useState<
+    { template_id: string; period_key: string; status: "pending" | "approved" | "rejected" }[]
+  >([]);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const reload = async (uid: string) => {
-    const [{ data: prof }, { data: parts }, { data: sp }, { data: rec }, cat, uq, rr, cl] =
-      await Promise.all([
+  const reload = useCallback(
+    async (uid: string) => {
+      const [
+        { data: prof },
+        { data: parts },
+        { data: sp },
+        { data: rec },
+        { data: subs },
+        cat,
+        uq,
+        rr,
+        cl,
+      ] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", uid).single(),
         supabase.from("participations").select("id").eq("user_id", uid),
         supabase.from("started_projects").select("id").eq("user_id", uid),
         supabase.from("recommendations").select("user_id").eq("user_id", uid).maybeSingle(),
+        supabase
+          .from("quest_submissions")
+          .select("template_id,period_key,status")
+          .eq("user_id", uid),
         fetchQuestCatalog(),
         fetchUserQuests(uid),
         fetchTodayReroll(uid),
         fetchRewardClaims(uid),
       ]);
-    if (!prof?.onboarded) {
-      nav({ to: "/onboarding" });
-      return;
-    }
-    setProfile(prof);
-    setCatalog(cat);
-    setUserQuests(uq);
-    setReroll({ seed: rr.seed, used: rr.used });
-    setClaims(cl);
-
-    const counts: Record<string, number> = {
-      "a-join": Math.min((parts || []).length, 3),
-      "a-project": Math.min((sp || []).length, 1),
-      "a-ai": rec ? 1 : 0,
-      "a-profile": prof
-        ? [
-            !!prof.full_name,
-            (prof.interests || []).length >= 3,
-            (prof.skills || []).length >= 1,
-            !!prof.goal,
-          ].filter(Boolean).length
-        : 0,
-    };
-    const existingBy = new Map(
-      uq.filter((r) => r.period_key === "permanent").map((r) => [r.template_id, r] as const),
-    );
-    let touched = false;
-    for (const [tid, cur] of Object.entries(counts)) {
-      const ex = existingBy.get(tid);
-      const server = ex?.progress ?? 0;
-      if (cur > server) {
-        try {
-          await syncActivityProgress(tid, cur, server);
-          touched = true;
-        } catch {}
+      if (!prof?.onboarded) {
+        nav({ to: "/onboarding" });
+        return;
       }
-    }
-    if (touched) setUserQuests(await fetchUserQuests(uid));
-  };
+      setProfile(prof);
+      setCatalog(cat);
+      setUserQuests(uq);
+      setReroll({ seed: rr.seed, used: rr.used });
+      setClaims(cl);
+      setSubmissions(subs || []);
+
+      const counts: Record<string, number> = {
+        "a-join": Math.min((parts || []).length, 3),
+        "a-project": Math.min((sp || []).length, 1),
+        "a-ai": rec ? 1 : 0,
+        "a-profile": prof
+          ? [
+              !!prof.full_name,
+              (prof.interests || []).length >= 3,
+              (prof.skills || []).length >= 1,
+              !!prof.goal,
+            ].filter(Boolean).length
+          : 0,
+      };
+      const existingBy = new Map(
+        uq.filter((r) => r.period_key === "permanent").map((r) => [r.template_id, r] as const),
+      );
+      let touched = false;
+      for (const [tid, cur] of Object.entries(counts)) {
+        const ex = existingBy.get(tid);
+        const server = ex?.progress ?? 0;
+        if (cur > server) {
+          try {
+            await syncActivityProgress(tid);
+            touched = true;
+          } catch (error: unknown) {
+            console.error("Could not synchronize quest progress", error);
+          }
+        }
+      }
+      if (touched) setUserQuests(await fetchUserQuests(uid));
+    },
+    [nav],
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -188,8 +219,8 @@ function QuestsPage() {
       nav({ to: "/auth" });
       return;
     }
-    reload(user.id);
-  }, [user, loading, nav]);
+    void reload(user.id);
+  }, [user, loading, nav, reload]);
 
   const period = todayKey();
   const stateBy = useMemo(() => {
@@ -197,6 +228,13 @@ function QuestsPage() {
     for (const r of userQuests) m.set(`${r.template_id}::${r.period_key}`, r);
     return m;
   }, [userQuests]);
+  const submissionBy = useMemo(() => {
+    const map = new Map<string, "pending" | "approved" | "rejected">();
+    for (const submission of submissions) {
+      map.set(`${submission.template_id}::${submission.period_key}`, submission.status);
+    }
+    return map;
+  }, [submissions]);
 
   const activityQuests: Quest[] = useMemo(() => {
     return catalog
@@ -214,9 +252,11 @@ function QuestsPage() {
           progress: Math.min(s?.progress ?? 0, t.target),
           awarded: !!s?.awarded,
           period: "permanent",
+          requiresEvidence: t.requires_evidence,
+          submissionStatus: submissionBy.get(`${t.id}::permanent`),
         };
       });
-  }, [catalog, stateBy]);
+  }, [catalog, stateBy, submissionBy]);
 
   const dailyQuests: Quest[] = useMemo(() => {
     return pickDaily(catalog, reroll.seed).map((t) => {
@@ -232,38 +272,40 @@ function QuestsPage() {
         progress: Math.min(s?.progress ?? 0, t.target),
         awarded: !!s?.awarded,
         period,
+        requiresEvidence: t.requires_evidence,
+        submissionStatus: submissionBy.get(`${t.id}::${period}`),
       };
     });
-  }, [catalog, reroll.seed, stateBy, period]);
+  }, [catalog, reroll.seed, stateBy, period, submissionBy]);
 
   async function doReroll() {
     if (!user) return;
     try {
-      const res = await useDailyReroll();
+      const res = await rerollDailyQuests();
       if (!res.ok) {
         toast.error("Այսօրվա թարմացումները սպառվել են");
         return;
       }
       setReroll({ seed: res.seed, used: 3 - res.remaining });
       toast.success(`Թարմացված է · մնաց ${res.remaining}`);
-    } catch (e: any) {
-      toast.error(e.message ?? "Չհաջողվեց թարմացնել");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց թարմացնել"));
     }
   }
 
   async function onClaimQuest(q: Quest, sourceEl?: Element) {
-    if (!user || q.awarded || q.progress < q.target) return;
-    setBusy(q.id);
-    try {
-      const { data: t } = await supabase
-        .from("quest_templates")
-        .select("requires_evidence")
-        .eq("id", q.id)
-        .maybeSingle();
-      if (t?.requires_evidence) {
-        nav({ to: "/quest-submit", search: { template_id: q.id } });
+    if (!user || q.awarded) return;
+    if (q.requiresEvidence) {
+      if (q.submissionStatus === "pending") {
+        toast("Ապացույցն արդեն սպասում է ստուգման");
         return;
       }
+      nav({ to: "/quest-submit", search: { template_id: q.id } });
+      return;
+    }
+    if (q.progress < q.target) return;
+    setBusy(q.id);
+    try {
       const res = await claimQuestXP(q.id, q.period);
       if (res.already) toast("Արդեն ստացված է");
       else {
@@ -271,14 +313,14 @@ function QuestsPage() {
         toast.success(`+${res.xp} XP!`);
       }
       await reload(user.id);
-    } catch (e: any) {
-      toast.error(e.message ?? "Չհաջողվեց ստանալ XP-ն");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ստանալ XP-ն"));
     } finally {
       setBusy(null);
     }
   }
 
-  async function onClaimReward(node: Node, key: number, sourceEl?: Element) {
+  async function onClaimReward(node: Node, key: string, sourceEl?: Element) {
     if (!user) return;
     setBusy(`lv-${key}`);
     try {
@@ -286,8 +328,8 @@ function QuestsPage() {
       if (sourceEl) burstConfettiFromElement(sourceEl);
       toast.success("Պարգևը ստացված է");
       setClaims(await fetchRewardClaims(user.id));
-    } catch (e: any) {
-      toast.error(e.message ?? "Չհաջողվեց ստանալ պարգևը");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ստանալ պարգևը"));
     } finally {
       setBusy(null);
     }
@@ -449,7 +491,7 @@ function QuestsPage() {
                 {road.map((n, i) => {
                   const unlocked = currentXP >= n.xp;
                   const current = !unlocked && (i === 0 || currentXP >= road[i - 1].xp);
-                  const key = n.level * 10000 + n.xp;
+                  const key = `${n.level}:${n.xp}`;
                   const claimed = claims.has(key);
                   return (
                     <div key={i} className="relative flex items-start">
@@ -482,7 +524,7 @@ function QuestsPage() {
               {road.map((n, i) => {
                 const unlocked = currentXP >= n.xp;
                 const current = !unlocked && (i === 0 || currentXP >= road[i - 1].xp);
-                const key = n.level * 10000 + n.xp;
+                const key = `${n.level}:${n.xp}`;
                 const claimed = claims.has(key);
                 return (
                   <li key={i} className="relative mb-4 last:mb-0">
@@ -533,6 +575,7 @@ function QuestCard({
 }) {
   const done = q.progress >= q.target;
   const pct = Math.min(100, Math.round((q.progress / q.target) * 100));
+  const awaitingReview = q.submissionStatus === "pending";
   const Icon = q.icon;
 
   return (
@@ -555,26 +598,45 @@ function QuestCard({
         </span>
       </div>
 
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-xs mb-1.5">
-          <span className="text-muted-foreground">Առաջընթաց</span>
-          <span className="font-semibold">
-            {q.progress} / {q.target}
-          </span>
+      {q.requiresEvidence ? (
+        <div className="mt-4 rounded-lg bg-secondary/55 px-3 py-2 text-xs text-muted-foreground">
+          Այս քվեստը հաստատվում է քո ուղարկած նկարագրությամբ կամ ֆայլով։
         </div>
-        <div className="h-2 bg-secondary rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-hero transition-all duration-700"
-            style={{ width: `${Math.max(2, pct)}%` }}
-          />
+      ) : (
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-muted-foreground">Առաջընթաց</span>
+            <span className="font-semibold">
+              {q.progress} / {q.target}
+            </span>
+          </div>
+          <div className="h-2 bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-hero transition-all duration-700"
+              style={{ width: `${Math.max(2, pct)}%` }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {q.awarded ? (
           <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-success">
             <Check className="w-4 h-4" /> XP ստացված է
           </div>
+        ) : awaitingReview ? (
+          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
+            <Loader2 className="w-4 h-4" /> Սպասում է ստուգման
+          </div>
+        ) : q.requiresEvidence ? (
+          <button
+            onClick={onClaim}
+            disabled={busy}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-gradient-hero text-primary-foreground text-sm font-semibold shadow-soft hover:shadow-lift transition-base disabled:opacity-50 min-h-[44px]"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            {q.submissionStatus === "rejected" ? "Վերաուղարկել ապացույց" : "Ուղարկել ապացույց"}
+          </button>
         ) : done ? (
           <button
             onClick={onClaim}
@@ -628,7 +690,7 @@ function RoadNode({
   busy,
   onClaim,
 }: {
-  node: any;
+  node: Node;
   unlocked: boolean;
   current?: boolean;
   claimed?: boolean;
@@ -658,7 +720,7 @@ function RewardCard({
   busy,
   onClaim,
 }: {
-  node: any;
+  node: Node;
   unlocked: boolean;
   current?: boolean;
   claimed?: boolean;
@@ -716,7 +778,7 @@ function RewardRow({
   busy,
   onClaim,
 }: {
-  node: any;
+  node: Node;
   unlocked: boolean;
   current?: boolean;
   claimed?: boolean;

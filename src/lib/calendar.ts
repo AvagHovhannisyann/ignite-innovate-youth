@@ -11,6 +11,7 @@ import {
   CalendarDays,
   type LucideIcon,
 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
 
 export type EventKind = "study" | "project" | "meeting" | "quest" | "opportunity" | "other";
 export type EventSource = "manual" | "ai" | "quest" | "project" | "opportunity" | "google";
@@ -31,7 +32,7 @@ export type CalEvent = {
 };
 
 /** DB row shape (snake_case) → domain event. */
-export function fromRow(r: any): CalEvent {
+export function fromRow(r: Tables<"schedule_events">): CalEvent {
   return {
     id: r.id,
     title: r.title,
@@ -175,16 +176,42 @@ export function snapMinutes(mins: number, step = 15) {
 // browsers built without the Armenian ICU locale, and the UI must stay Armenian.
 
 const MONTHS_GEN = [
-  "հունվարի", "փետրվարի", "մարտի", "ապրիլի", "մայիսի", "հունիսի",
-  "հուլիսի", "օգոստոսի", "սեպտեմբերի", "հոկտեմբերի", "նոյեմբերի", "դեկտեմբերի",
+  "հունվարի",
+  "փետրվարի",
+  "մարտի",
+  "ապրիլի",
+  "մայիսի",
+  "հունիսի",
+  "հուլիսի",
+  "օգոստոսի",
+  "սեպտեմբերի",
+  "հոկտեմբերի",
+  "նոյեմբերի",
+  "դեկտեմբերի",
 ];
 const MONTHS_NOM = [
-  "Հունվար", "Փետրվար", "Մարտ", "Ապրիլ", "Մայիս", "Հունիս",
-  "Հուլիս", "Օգոստոս", "Սեպտեմբեր", "Հոկտեմբեր", "Նոյեմբեր", "Դեկտեմբեր",
+  "Հունվար",
+  "Փետրվար",
+  "Մարտ",
+  "Ապրիլ",
+  "Մայիս",
+  "Հունիս",
+  "Հուլիս",
+  "Օգոստոս",
+  "Սեպտեմբեր",
+  "Հոկտեմբեր",
+  "Նոյեմբեր",
+  "Դեկտեմբեր",
 ];
 // indexed by Date#getDay() (0 = Sunday)
 const WEEKDAYS_LONG = [
-  "կիրակի", "երկուշաբթի", "երեքշաբթի", "չորեքշաբթի", "հինգշաբթի", "ուրբաթ", "շաբաթ",
+  "կիրակի",
+  "երկուշաբթի",
+  "երեքշաբթի",
+  "չորեքշաբթի",
+  "հինգշաբթի",
+  "ուրբաթ",
+  "շաբաթ",
 ];
 const WEEKDAYS_SHORT = ["Կիր", "Երկ", "Երք", "Չրք", "Հնգ", "Ուրբ", "Շբթ"];
 

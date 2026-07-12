@@ -5,14 +5,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { EmptyState } from "@/components/PageLoader";
 import { Flame, Rocket, TrendingUp, ArrowRight } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/trending")({ component: Trending });
 
 function Trending() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [recent, setRecent] = useState<any[] | null>(null);
-  const [projects, setProjects] = useState<any[] | null>(null);
+  const [recent, setRecent] = useState<Tables<"opportunities">[] | null>(null);
+  const [projects, setProjects] = useState<Tables<"started_projects">[] | null>(null);
 
   useEffect(() => {
     if (loading) return;

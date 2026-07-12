@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ import {
   type SupportThread,
 } from "@/lib/support";
 import { Loader2, LifeBuoy, Plus, Send, ArrowLeft, MessageCircle } from "lucide-react";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/support")({ component: SupportPage });
 
@@ -30,13 +32,13 @@ function SupportPage() {
   const [subject, setSubject] = useState("");
   const [firstMsg, setFirstMsg] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setThreads(await fetchMyThreads());
     } catch {
       setThreads([]);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -45,7 +47,7 @@ function SupportPage() {
       return;
     }
     void load();
-  }, [user, loading, nav]);
+  }, [user, loading, nav, load]);
 
   async function submitNew(e: React.FormEvent) {
     e.preventDefault();
@@ -57,8 +59,8 @@ function SupportPage() {
       setFirstMsg("");
       await load();
       setActive(t);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ստեղծել հարցումը"));
     } finally {
       setCreating(false);
     }
@@ -96,15 +98,21 @@ function SupportPage() {
                 <Plus className="w-4 h-4 text-primary" /> Նոր հարցում
               </div>
               <input
+                id="support-subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
+                maxLength={140}
+                aria-label="Հարցման թեմա"
                 placeholder="Թեմա (օր.՝ «Չեմ կարողանում ուղարկել նախագիծը»)"
-                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm min-h-[44px]"
               />
               <textarea
+                id="support-first-message"
                 value={firstMsg}
                 onChange={(e) => setFirstMsg(e.target.value)}
                 rows={3}
+                maxLength={4000}
+                aria-label="Հարցման նկարագրություն"
                 placeholder="Նկարագրիր խնդիրը կամ հարցը…"
                 className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm resize-none"
               />
@@ -165,7 +173,7 @@ function SupportPage() {
                           </span>
                         </div>
                         <div className="text-[11px] text-muted-foreground mt-1">
-                          {new Date(t.last_message_at).toLocaleString()}
+                          {new Date(t.last_message_at).toLocaleString("hy-AM")}
                         </div>
                       </button>
                     </li>
@@ -196,17 +204,17 @@ export function ThreadView({
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setMessages(await fetchMessages(thread.id));
     } catch {
       setMessages([]);
     }
-  }
+  }, [thread.id]);
 
   useEffect(() => {
-    load();
-  }, [thread.id]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     const ch = supabase
@@ -227,7 +235,7 @@ export function ThreadView({
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [thread.id]);
+  }, [thread.id, load]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -238,11 +246,11 @@ export function ThreadView({
     if (!draft.trim() || sending) return;
     setSending(true);
     try {
-      await sendMessage(thread.id, userId, adminMode ? "admin" : "user", draft);
+      await sendMessage(thread.id, draft);
       setDraft("");
       await load();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ուղարկել հաղորդագրությունը"));
     } finally {
       setSending(false);
     }
@@ -294,7 +302,7 @@ export function ThreadView({
                 >
                   <div className="text-[10px] opacity-70 mb-1">
                     {m.sender_role === "admin" ? "Ադմին" : "Դու"} ·{" "}
-                    {new Date(m.created_at).toLocaleString()}
+                    {new Date(m.created_at).toLocaleString("hy-AM")}
                   </div>
                   {m.content}
                 </div>
@@ -310,6 +318,8 @@ export function ThreadView({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={1}
+          maxLength={4000}
+          aria-label={adminMode ? "Ադմինի պատասխանը" : "Աջակցության հաղորդագրություն"}
           placeholder={adminMode ? "Պատասխանիր որպես ադմին…" : "Գրիր հաղորդագրություն…"}
           className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-input bg-background text-sm resize-none min-h-[44px] max-h-32"
         />

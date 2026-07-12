@@ -17,13 +17,14 @@ import {
   ArrowUpRight,
   Check,
   Zap,
+  Leaf,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
-    links: [{ rel: "preload", as: "image", href: logo, fetchPriority: "high" } as any],
+    links: [{ rel: "preload", as: "image", href: logo }],
   }),
 });
 
@@ -64,8 +65,11 @@ function AgentModule() {
         <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3 py-2 w-fit">
           Ի՞նչ նախագիծ սկսեմ։
         </div>
-        <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-secondary px-3 py-2">
-          Քո «դիզայն» և «էկոլոգիա» հետաքրքրություններով՝ փորձիր «Կանաչ բակ» պաստառների շարքը 🌱
+        <div className="flex max-w-[92%] items-start gap-1.5 rounded-2xl rounded-bl-sm bg-secondary px-3 py-2">
+          <Leaf className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
+          <span>
+            Քո «դիզայն» և «էկոլոգիա» հետաքրքրություններով՝ փորձիր «Կանաչ բակ» պաստառների շարքը։
+          </span>
         </div>
         <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-secondary px-3 py-2">
           Ավելացնե՞մ առաջին քայլը օրակարգիդ։

@@ -21,7 +21,17 @@ import { MonthView } from "@/components/calendar/MonthView";
 import { AgendaView } from "@/components/calendar/AgendaView";
 import { EventSheet, type SheetTarget } from "@/components/calendar/EventSheet";
 import { SubscribeMenu } from "@/components/calendar/SubscribeMenu";
-import { ChevronLeft, ChevronRight, Plus, Loader2, Link2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Loader2,
+  AlertTriangle,
+  CalendarDays,
+  Lightbulb,
+  Check,
+} from "lucide-react";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/schedule")({ component: SchedulePage });
 
@@ -37,7 +47,15 @@ function SchedulePage() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const isMobile = useIsMobile();
-  const { events, loading: eventsLoading, create, update, remove } = useSchedule(user?.id);
+  const {
+    events,
+    loading: eventsLoading,
+    error: eventsError,
+    reload,
+    create,
+    update,
+    remove,
+  } = useSchedule(user?.id);
 
   const [view, setView] = useState<View>("week");
   const [viewTouched, setViewTouched] = useState(false);
@@ -48,6 +66,7 @@ function SchedulePage() {
   const [googleStatus, setGoogleStatus] = useState<
     "unknown" | "available" | "connected" | "unconfigured"
   >("unknown");
+  const [googleConnecting, setGoogleConnecting] = useState(false);
   const jumpRef = useRef<HTMLInputElement>(null);
 
   // Default to the agenda view on phones (until the user picks one).
@@ -76,6 +95,7 @@ function SchedulePage() {
       const jwt = data.session?.access_token;
       fetch("/api/google/status", {
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : undefined,
+        cache: "no-store",
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) =>
@@ -93,19 +113,25 @@ function SchedulePage() {
   }, [user, loading, nav]);
 
   async function connectGoogle() {
-    const { data } = await supabase.auth.getSession();
-    const jwt = data.session?.access_token;
-    if (!jwt) return;
-    const res = await fetch("/api/google/connect", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    if (!res.ok) {
-      toast.error("Google Calendar-ը դեռ կարգավորված չէ");
-      return;
+    if (googleConnecting) return;
+    setGoogleConnecting(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const jwt = data.session?.access_token;
+      if (!jwt) throw new Error("auth required");
+      const res = await fetch("/api/google/connect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("connect failed");
+      const payload = (await res.json()) as { url?: string };
+      if (!payload.url) throw new Error("missing redirect");
+      window.location.assign(payload.url);
+    } catch {
+      toast.error("Google Calendar-ի միացումը չհաջողվեց");
+      setGoogleConnecting(false);
     }
-    const { url } = await res.json();
-    if (url) window.location.href = url;
   }
 
   // Keyboard shortcuts: t=today, n=new, ←/→ navigate.
@@ -165,9 +191,9 @@ function SchedulePage() {
         await create(draft);
         toast.success("Իրադարձությունն ավելացվեց");
       }
-    } catch (e: any) {
-      toast.error(e?.message ?? "Չհաջողվեց պահպանել");
-      throw e;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց պահպանել"));
+      throw error;
     }
   }
 
@@ -177,16 +203,16 @@ function SchedulePage() {
       toast("Իրադարձությունը ջնջվեց", {
         action: { label: "Վերադարձնել", onClick: () => void restore() },
       });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Չհաջողվեց ջնջել");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ջնջել"));
     }
   }
 
   async function onDragUpdate(id: string, patch: { start: Date; end: Date }) {
     try {
       await update(id, patch);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Չհաջողվեց տեղափոխել");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց տեղափոխել"));
     }
   }
 
@@ -209,21 +235,21 @@ function SchedulePage() {
           <div className="flex items-center gap-1.5 min-w-0">
             <button
               onClick={() => shift(-1)}
-              className="min-w-[40px] min-h-[40px] grid place-items-center rounded-lg hover:bg-secondary"
+              className="grid min-h-11 min-w-11 place-items-center rounded-lg hover:bg-secondary"
               aria-label="Նախորդ"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={() => shift(1)}
-              className="min-w-[40px] min-h-[40px] grid place-items-center rounded-lg hover:bg-secondary"
+              className="grid min-h-11 min-w-11 place-items-center rounded-lg hover:bg-secondary"
               aria-label="Հաջորդ"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
             <button
               onClick={() => setAnchor(new Date())}
-              className="px-3 min-h-[40px] rounded-lg hover:bg-secondary text-sm font-medium"
+              className="min-h-11 rounded-lg px-3 text-sm font-medium hover:bg-secondary"
             >
               Այսօր
             </button>
@@ -234,15 +260,16 @@ function SchedulePage() {
             <div className="relative">
               <button
                 onClick={() => jumpRef.current?.showPicker?.()}
-                className="min-w-[40px] min-h-[40px] grid place-items-center rounded-lg hover:bg-secondary"
+                className="grid min-h-11 min-w-11 place-items-center rounded-lg hover:bg-secondary"
                 aria-label="Ընտրել ամսաթիվ"
               >
-                <Link2 className="w-4 h-4 rotate-45 opacity-0 absolute" />
-                📅
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
               </button>
               <input
                 ref={jumpRef}
                 type="date"
+                tabIndex={-1}
+                aria-hidden="true"
                 className="absolute inset-0 opacity-0 w-0 h-0"
                 onChange={(e) => e.target.value && setAnchor(new Date(e.target.value + "T00:00"))}
               />
@@ -259,7 +286,7 @@ function SchedulePage() {
                     setView(v);
                     setViewTouched(true);
                   }}
-                  className={`px-2.5 min-h-[36px] rounded-md text-xs font-medium transition-colors ${
+                  className={`min-h-11 rounded-md px-2.5 text-xs font-medium transition-colors ${
                     view === v ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
                   }`}
                 >
@@ -269,11 +296,12 @@ function SchedulePage() {
             </div>
             <select
               value={view}
+              aria-label="Օրացույցի տեսք"
               onChange={(e) => {
                 setView(e.target.value as View);
                 setViewTouched(true);
               }}
-              className="sm:hidden px-2 min-h-[40px] rounded-lg border border-border bg-card text-sm"
+              className="min-h-11 rounded-lg border border-border bg-card px-2 text-sm sm:hidden"
             >
               {(["agenda", "day", "week", "month"] as View[]).map((v) => (
                 <option key={v} value={v}>
@@ -286,21 +314,29 @@ function SchedulePage() {
             {googleStatus === "available" && (
               <button
                 onClick={connectGoogle}
-                className="hidden md:inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-lg bg-secondary hover:bg-secondary/70 text-sm"
+                disabled={googleConnecting}
+                className="hidden min-h-11 items-center gap-1.5 rounded-lg bg-secondary px-3 text-sm hover:bg-secondary/70 md:inline-flex"
               >
-                <span>📅</span> Google
+                {googleConnecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                )}{" "}
+                Google
               </button>
             )}
             {googleStatus === "connected" && (
-              <span className="hidden md:inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-lg bg-success/10 text-success text-sm">
-                <span>📅</span> Google ✓
+              <span className="hidden min-h-11 items-center gap-1.5 rounded-lg bg-success/10 px-3 text-sm text-success md:inline-flex">
+                <CalendarDays className="h-4 w-4" aria-hidden="true" /> Google
+                <Check className="h-4 w-4" aria-label="Միացված" />
               </span>
             )}
             <button
               onClick={() => openCreate(new Date(new Date().setMinutes(0, 0, 0)))}
-              className="inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
-              <Plus className="w-4 h-4" /> <span className="hidden min-[420px]:inline">Ավելացնել</span>
+              <Plus className="w-4 h-4" />{" "}
+              <span className="hidden min-[420px]:inline">Ավելացնել</span>
             </button>
           </div>
         </div>
@@ -308,14 +344,32 @@ function SchedulePage() {
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {KIND_ORDER.map((k) => (
-            <span key={k} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span
+              key={k}
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
+            >
               <span className={`w-2 h-2 rounded-full ${KIND_META[k].dot}`} /> {KIND_META[k].label}
             </span>
           ))}
         </div>
 
         {/* Views */}
-        {eventsLoading ? (
+        {eventsError ? (
+          <div
+            className="card-base flex min-h-40 flex-col items-center justify-center gap-3 p-5 text-center"
+            role="alert"
+          >
+            <AlertTriangle className="h-7 w-7 text-destructive" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">Օրակարգը չհաջողվեց բեռնել։</p>
+            <button
+              type="button"
+              onClick={() => void reload()}
+              className="inline-flex min-h-11 items-center rounded-lg bg-secondary px-4 text-sm font-medium"
+            >
+              Կրկին փորձել
+            </button>
+          </div>
+        ) : eventsLoading ? (
           <div className="flex items-center justify-center h-60 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Բեռնվում է…
@@ -350,14 +404,22 @@ function SchedulePage() {
         )}
 
         {googleStatus === "unconfigured" && (
-          <p className="text-[11px] text-muted-foreground">
-            💡 Խորհուրդ․ սեղմիր «Բաժանորդագրվել»՝ այս օրացույցը Google/Apple/Outlook-ում ավտոմատ
-            համաժամեցնելու համար։
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              Խորհուրդ․ սեղմիր «Բաժանորդագրվել»՝ այս օրացույցը Google/Apple/Outlook-ում ավտոմատ
+              համաժամեցնելու համար։
+            </span>
           </p>
         )}
       </div>
 
-      <EventSheet target={sheet} onClose={() => setSheet(null)} onSave={onSave} onDelete={onDelete} />
+      <EventSheet
+        target={sheet}
+        onClose={() => setSheet(null)}
+        onSave={onSave}
+        onDelete={onDelete}
+      />
     </>
   );
 }

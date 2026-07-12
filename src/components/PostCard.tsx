@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Heart, MessageCircle, Share2, MapPin, Loader2, Send, BadgeCheck,
-} from "lucide-react";
+import { Heart, MessageCircle, Share2, MapPin, Loader2, Send, BadgeCheck } from "lucide-react";
 import { type Post, toggleLike, listComments, addComment } from "@/lib/feed";
 import { levelFromXP } from "@/lib/constants";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
+
+type FeedComment = Awaited<ReturnType<typeof listComments>>[number];
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -39,9 +40,21 @@ function MediaMosaic({ media }: { media: { url: string; type: string }[] }) {
   const Cell = ({ m, className }: { m: { url: string; type: string }; className: string }) => (
     <div className={`bg-secondary overflow-hidden ${className}`}>
       {m.type === "video" ? (
-        <video src={m.url} controls playsInline preload="metadata" className="w-full h-full object-cover" />
+        <video
+          src={m.url}
+          controls
+          playsInline
+          preload="metadata"
+          aria-label="Գրառման կցված տեսանյութ"
+          className="w-full h-full object-cover"
+        />
       ) : (
-        <img src={m.url} alt="" loading="lazy" className="w-full h-full object-cover" />
+        <img
+          src={m.url}
+          alt="Գրառման կցված նկար"
+          loading="lazy"
+          className="w-full h-full object-cover"
+        />
       )}
     </div>
   );
@@ -99,7 +112,7 @@ export function PostCard({
   const [burst, setBurst] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<FeedComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
@@ -155,8 +168,8 @@ export function PostCard({
       setComments(await listComments(post.id));
       setCommentCount((n) => n + 1);
       onChanged?.();
-    } catch (err: any) {
-      toast.error(err?.message || "Չհաջողվեց ուղարկել");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ուղարկել"));
     } finally {
       setPosting(false);
     }
@@ -166,7 +179,11 @@ export function PostCard({
     const url = `${window.location.origin}/feed#post-${post.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: post.title || "Գրառում", text: post.content.slice(0, 120), url });
+        await navigator.share({
+          title: post.title || "Գրառում",
+          text: post.content.slice(0, 120),
+          url,
+        });
       } else {
         await navigator.clipboard.writeText(url);
         toast.success("Հղումը պատճենվեց");
@@ -180,7 +197,7 @@ export function PostCard({
   const level = levelFromXP(post.author?.xp || 0);
   const longText = post.content.length > 420;
   const actionBtn =
-    "min-h-[40px] flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-sm font-medium transition-colors";
+    "min-h-[44px] flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-sm font-medium transition-colors";
 
   return (
     <article
@@ -285,7 +302,9 @@ export function PostCard({
         <button
           onClick={() => void setLike(!liked)}
           className={`${actionBtn} ${
-            liked ? "text-destructive" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            liked
+              ? "text-destructive"
+              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
           }`}
         >
           <Heart
@@ -319,14 +338,14 @@ export function PostCard({
           ) : (
             <ul className="space-y-2 py-3">
               {comments.length === 0 && (
-                <li className="text-xs text-muted-foreground">Եղիր առաջինը, ով կմեկնաբանի ✨</li>
+                <li className="text-xs text-muted-foreground">Եղիր առաջինը, ով կմեկնաբանի։</li>
               )}
               {comments.map((c) => (
                 <li
                   key={c.id}
                   className="text-sm grid grid-cols-[auto_minmax(0,1fr)] gap-2 items-start min-w-0"
                 >
-                  <Avatar name={c.author?.full_name || c.author?.email || "U"} size={7} />
+                  <Avatar name={c.author?.full_name || "Օ"} size={7} />
                   <div className="bg-card border border-border rounded-2xl rounded-tl-md px-3 py-2 min-w-0">
                     <div className="text-[11px] font-semibold break-words">
                       {c.author?.full_name || "Օգտատեր"}
@@ -348,14 +367,20 @@ export function PostCard({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Գրիր մեկնաբանություն…"
-                className="flex-1 min-w-0 px-3.5 py-2 rounded-full border border-input bg-background text-sm min-h-[40px] outline-none focus:ring-2 focus:ring-ring"
+                aria-label="Մեկնաբանություն"
+                maxLength={1000}
+                className="flex-1 min-w-0 px-3.5 py-2 rounded-full border border-input bg-background text-sm min-h-[44px] outline-none focus:ring-2 focus:ring-ring"
               />
               <button
                 disabled={!draft.trim() || posting}
                 aria-label="Ուղարկել"
-                className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground disabled:opacity-50"
+                className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full bg-primary text-primary-foreground disabled:opacity-50"
               >
-                {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {posting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </button>
             </form>
           )}

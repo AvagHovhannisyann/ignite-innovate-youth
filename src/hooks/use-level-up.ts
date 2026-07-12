@@ -20,7 +20,7 @@ export function useLevelUpCelebration(userId: string | undefined, xp: number | u
     }
     if (last !== null && level.level > last) {
       burstConfetti(window.innerWidth / 2, window.innerHeight * 0.3, 48);
-      toast.success(`Նոր մակարդակ․ ${level.level} — ${level.name} 🎉`, {
+      toast.success(`Նոր մակարդակ․ ${level.level} — ${level.name}`, {
         description: "Շարունակիր այդպես՝ ավելի շատ XP, ավելի շատ հնարավորություններ։",
         duration: 6000,
       });

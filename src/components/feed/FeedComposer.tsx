@@ -1,26 +1,16 @@
-import { useRef, useState } from "react";
-import { createPost, uploadMedia, signMedia } from "@/lib/feed";
+import { useEffect, useRef, useState } from "react";
+import {
+  createPost,
+  uploadMedia,
+  signMedia,
+  removeMediaFiles,
+  MAX_POST_MEDIA_FILES,
+} from "@/lib/feed";
 import { burstConfetti } from "@/lib/confetti";
 import { toast } from "sonner";
-import {
-  ImagePlus, Loader2, MapPin, Tag, X, Video, Send, Sparkles, PenLine,
-} from "lucide-react";
-
-/** Rotating conversation starters — one per day, so the box never feels stale. */
-const PROMPTS = [
-  "Ի՞նչ սովորեցիր այս շաբաթ, որով հպարտ ես։",
-  "Ցույց տուր նախագծիդ ընթացքը՝ մեկ նկարով։",
-  "Ի՞նչ գաղափար ունես, որին թիմակիցներ են պետք։",
-  "Խորհուրդ տուր նոր միացած ուսանողին։",
-  "Ո՞ր հմտությունն ես հիմա սովորում և ինչու։",
-  "Կիսվիր այս շաբաթվա փոքր հաղթանակով 🏆",
-  "Ի՞նչ միջոցառման ես պատրաստվում մասնակցել։",
-];
-
-export function dailyPrompt(offset = 0) {
-  const day = Math.floor(Date.now() / 86400000);
-  return PROMPTS[(day + offset) % PROMPTS.length];
-}
+import { getErrorMessage } from "@/lib/utils";
+import { ImagePlus, Loader2, MapPin, Tag, X, Video, Send, Sparkles, PenLine } from "lucide-react";
+import { dailyPrompt } from "@/lib/feed-prompts";
 
 export function FeedComposer({
   userId,
@@ -43,6 +33,19 @@ export function FeedComposer({
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const draftUploads = useRef(new Set<string>());
+
+  useEffect(
+    () => () => {
+      const abandoned = Array.from(draftUploads.current);
+      if (abandoned.length) {
+        void removeMediaFiles(abandoned).catch((cleanupError: unknown) =>
+          console.error("Could not clean up abandoned feed draft", cleanupError),
+        );
+      }
+    },
+    [],
+  );
 
   const initial = (displayName || "U").slice(0, 1).toUpperCase();
 
@@ -64,26 +67,55 @@ export function FeedComposer({
   async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    if (mediaPaths.length + files.length > MAX_POST_MEDIA_FILES) {
+      toast.error(`Կարելի է կցել առավելագույնը ${MAX_POST_MEDIA_FILES} մեդիա ֆայլ։`);
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
+    const uploaded: { path: string; type: string }[] = [];
     try {
-      const uploaded = await Promise.all(files.map((f) => uploadMedia(userId, f)));
+      for (const file of files) uploaded.push(await uploadMedia(userId, file));
       const paths = uploaded.map((u) => u.path);
+      paths.forEach((path) => draftUploads.current.add(path));
       const signed = await signMedia(paths);
       setMediaPaths((p) => [...p, ...paths]);
       setMediaTypes((t) => [...t, ...uploaded.map((u) => u.type)]);
       setPreviews((p) => [...p, ...signed]);
-    } catch (err: any) {
-      toast.error(err?.message || "Չհաջողվեց վերբեռնել ֆայլը");
+    } catch (error: unknown) {
+      try {
+        await removeMediaFiles(uploaded.map((item) => item.path));
+      } catch (cleanupError: unknown) {
+        console.error("Could not clean up interrupted post upload", cleanupError);
+      }
+      toast.error(getErrorMessage(error, "Չհաջողվեց վերբեռնել ֆայլը"));
     } finally {
       setUploading(false);
       e.target.value = "";
     }
   }
 
-  function removeMedia(i: number) {
+  async function removeMedia(i: number) {
+    const path = mediaPaths[i];
+    if (path) draftUploads.current.delete(path);
     setMediaPaths((p) => p.filter((_, idx) => idx !== i));
     setMediaTypes((t) => t.filter((_, idx) => idx !== i));
     setPreviews((p) => p.filter((_, idx) => idx !== i));
+    try {
+      await removeMediaFiles(path ? [path] : []);
+    } catch (error: unknown) {
+      console.error("Could not remove discarded post media", error);
+    }
+  }
+
+  async function cancel() {
+    try {
+      await removeMediaFiles(mediaPaths);
+      mediaPaths.forEach((path) => draftUploads.current.delete(path));
+    } catch (error: unknown) {
+      console.error("Could not remove cancelled post media", error);
+    }
+    reset();
   }
 
   async function submit() {
@@ -109,18 +141,19 @@ export function FeedComposer({
         location: location.trim() || null,
       });
       burstConfetti(window.innerWidth / 2, 200, 28);
-      toast.success("Ուղարկված է ✨ Կհայտնվի ֆիդում հաստատվելուց հետո։");
+      toast.success("Ուղարկված է։ Կհայտնվի ֆիդում հաստատվելուց հետո։");
+      draftUploads.current.clear();
       reset();
       onPosted();
-    } catch (err: any) {
-      toast.error(err?.message || "Չհաջողվեց ուղարկել");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Չհաջողվեց ուղարկել"));
     } finally {
       setSubmitting(false);
     }
   }
 
   const inputCls =
-    "w-full px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring min-h-[40px]";
+    "w-full px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring min-h-[44px]";
 
   if (!open) {
     return (
@@ -155,13 +188,14 @@ export function FeedComposer({
             rows={3}
             maxLength={4000}
             placeholder={dailyPrompt()}
+            aria-label="Գրառման բովանդակություն"
             className="w-full bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground min-h-[72px]"
           />
         </div>
         <button
-          onClick={reset}
+          onClick={() => void cancel()}
           aria-label="Փակել"
-          className="shrink-0 w-8 h-8 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground"
+          className="shrink-0 w-11 h-11 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground"
         >
           <X className="w-4 h-4" />
         </button>
@@ -172,15 +206,19 @@ export function FeedComposer({
           {previews.map((src, i) => (
             <div key={i} className="relative aspect-square bg-secondary rounded-xl overflow-hidden">
               {mediaTypes[i] === "video" ? (
-                <video src={src} className="w-full h-full object-cover" />
+                <video
+                  src={src}
+                  aria-label={`Կցված տեսանյութ ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <img src={src} alt="" className="w-full h-full object-cover" />
+                <img src={src} alt={`Կցված նկար ${i + 1}`} className="w-full h-full object-cover" />
               )}
               <button
                 type="button"
-                onClick={() => removeMedia(i)}
-                aria-label="Հեռացնել"
-                className="absolute top-1 right-1 w-8 h-8 rounded-full bg-background/90 grid place-items-center shadow-soft"
+                onClick={() => void removeMedia(i)}
+                aria-label={`Հեռացնել կցված ֆայլ ${i + 1}`}
+                className="absolute top-1 right-1 w-11 h-11 rounded-full bg-background/90 grid place-items-center shadow-soft"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -199,6 +237,7 @@ export function FeedComposer({
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             placeholder="Թեգեր՝ ստորակետով"
+            aria-label="Գրառման թեգեր"
             className={`${inputCls} pl-9`}
           />
         </div>
@@ -208,6 +247,7 @@ export function FeedComposer({
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="Վայր (ոչ պարտադիր)"
+            aria-label="Գրառման վայր"
             className={`${inputCls} pl-9`}
           />
         </div>
@@ -216,7 +256,8 @@ export function FeedComposer({
       <div className="flex items-center justify-between gap-2 pt-1">
         <div className="flex items-center gap-1">
           <label
-            className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-lg hover:bg-secondary text-sm text-muted-foreground cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+            aria-label="Կցել մեդիա"
+            className={`inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg hover:bg-secondary text-sm text-muted-foreground cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}
           >
             {uploading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -224,20 +265,32 @@ export function FeedComposer({
               <ImagePlus className="w-4 h-4" />
             )}
             <span className="hidden min-[420px]:inline">Մեդիա</span>
-            <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={onFiles} />
+            <input
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+              className="hidden"
+              onChange={onFiles}
+            />
           </label>
           <span className="text-[11px] text-muted-foreground hidden sm:inline-flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-primary" /> Հրապարակվում է ադմինի հաստատումից հետո
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground tabular-nums">{content.length}/4000</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {content.length}/4000
+          </span>
           <button
             onClick={submit}
             disabled={submitting || uploading || (!content.trim() && !mediaPaths.length)}
-            className="inline-flex items-center gap-1.5 px-4 min-h-[40px] rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
             Կիսվել
           </button>
         </div>
