@@ -114,13 +114,13 @@ function SupportPage() {
                 maxLength={4000}
                 aria-label="Հարցման նկարագրություն"
                 placeholder="Նկարագրիր խնդիրը կամ հարցը…"
-                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm resize-none"
+                className="input-base resize-none"
               />
               <div className="flex justify-end">
                 <button
                   type="submit"
                   disabled={creating || !firstMsg.trim()}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 min-h-[44px]"
+                  className="btn btn-primary"
                 >
                   {creating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

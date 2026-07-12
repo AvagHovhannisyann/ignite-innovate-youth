@@ -220,13 +220,13 @@ function Onboarding() {
                 maxLength={40}
                 aria-label="Այլ հմտություն"
                 placeholder="Գրիր քո հմտությունը…"
-                className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2.5 rounded-lg border border-input bg-background text-sm"
+                className="input-base flex-1 min-w-0"
               />
               <button
                 type="button"
                 onClick={addCustomSkill}
                 disabled={!customSkill.trim()}
-                className="shrink-0 min-h-[44px] px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                className="btn btn-primary shrink-0"
               >
                 Ավելացնել
               </button>

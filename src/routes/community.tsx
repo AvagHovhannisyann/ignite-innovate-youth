@@ -106,10 +106,7 @@ function Community() {
             title="Դեռ ոչինչ չկա այստեղ"
             description="Միացիր քո առաջին հնարավորությանը կամ սկսիր նախագիծ․ ակտիվությունդ կհայտնվի այստեղ՝ իրական ժամանակում։"
             action={
-              <Link
-                to="/opportunities"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover-lift min-h-[44px]"
-              >
+              <Link to="/opportunities" className="btn btn-primary">
                 Տեսնել հնարավորությունները
               </Link>
             }
